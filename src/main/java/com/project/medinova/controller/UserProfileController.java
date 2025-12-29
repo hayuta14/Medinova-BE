@@ -1,6 +1,5 @@
 package com.project.medinova.controller;
 
-import com.project.medinova.dto.ApiResponse;
 import com.project.medinova.dto.PatientMedicalHistoryRequest;
 import com.project.medinova.entity.PatientMedicalHistory;
 import com.project.medinova.entity.UserProfile;
@@ -28,9 +27,9 @@ public class UserProfileController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized")
     })
     @GetMapping
-    public ResponseEntity<ApiResponse<UserProfile>> getUserProfile() {
+    public ResponseEntity<UserProfile> getUserProfile() {
         UserProfile profile = userProfileService.getUserProfile();
-        return ResponseEntity.ok(ApiResponse.success(profile));
+        return ResponseEntity.ok(profile);
     }
 
     @Operation(summary = "Update medical history", description = "Update medical history for current user based on JWT token")
@@ -40,9 +39,9 @@ public class UserProfileController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Validation error")
     })
     @PutMapping
-    public ResponseEntity<ApiResponse<PatientMedicalHistory>> updateMedicalHistory(@Valid @RequestBody PatientMedicalHistoryRequest request) {
+    public ResponseEntity<PatientMedicalHistory> updateMedicalHistory(@Valid @RequestBody PatientMedicalHistoryRequest request) {
         PatientMedicalHistory medicalHistory = userProfileService.updateMedicalHistory(request);
-        return ResponseEntity.ok(ApiResponse.success("Medical history updated successfully", medicalHistory));
+        return ResponseEntity.ok(medicalHistory);
     }
 
     @Operation(summary = "Get medical history", description = "Get current user's medical history")
@@ -52,12 +51,12 @@ public class UserProfileController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Medical history not found")
     })
     @GetMapping("/medical-history")
-    public ResponseEntity<ApiResponse<PatientMedicalHistory>> getMedicalHistory() {
+    public ResponseEntity<PatientMedicalHistory> getMedicalHistory() {
         PatientMedicalHistory medicalHistory = userProfileService.getMedicalHistory();
         if (medicalHistory == null) {
-            return ResponseEntity.ok(ApiResponse.success(null));
+            return ResponseEntity.noContent().build();
         }
-        return ResponseEntity.ok(ApiResponse.success(medicalHistory));
+        return ResponseEntity.ok(medicalHistory);
     }
 }
 

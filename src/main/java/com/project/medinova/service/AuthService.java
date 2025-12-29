@@ -4,6 +4,7 @@ import com.project.medinova.config.JwtTokenProvider;
 import com.project.medinova.dto.AuthRequest;
 import com.project.medinova.dto.AuthResponse;
 import com.project.medinova.dto.RegisterRequest;
+import com.project.medinova.dto.TokenValidationResponse;
 import com.project.medinova.entity.User;
 import com.project.medinova.exception.BadRequestException;
 import com.project.medinova.exception.UnauthorizedException;
@@ -17,6 +18,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -144,6 +148,66 @@ public class AuthService {
         authResponse.setRole(user.getRole());
 
         return authResponse;
+    }
+
+    public TokenValidationResponse validateToken(String token) {
+        TokenValidationResponse response = new TokenValidationResponse();
+        
+        if (token == null || token.isEmpty()) {
+            response.setValid(false);
+            response.setExpired(true);
+            response.setMessage("Token is empty or null");
+            return response;
+        }
+
+        // Remove "Bearer " prefix if present
+        if (token.startsWith("Bearer ")) {
+            token = token.substring(7);
+        }
+
+        // Check if token is blacklisted
+        if (isTokenBlacklisted(token)) {
+            response.setValid(false);
+            response.setExpired(true);
+            response.setMessage("Token has been revoked (logged out)");
+            return response;
+        }
+
+        try {
+            // Validate token
+            boolean isValid = tokenProvider.validateToken(token);
+            Date expirationDate = tokenProvider.getExpirationDateFromToken(token);
+            boolean isExpired = expirationDate.before(new Date());
+
+            response.setValid(isValid && !isExpired);
+            response.setExpired(isExpired);
+            
+            if (expirationDate != null) {
+                LocalDateTime expirationDateTime = LocalDateTime.ofInstant(
+                    expirationDate.toInstant(), ZoneId.systemDefault());
+                response.setExpirationDate(expirationDateTime);
+            }
+
+            if (isValid && !isExpired) {
+                // Get user info from token
+                String email = tokenProvider.getUsernameFromToken(token);
+                Long userId = tokenProvider.getUserIdFromToken(token);
+                String role = tokenProvider.getRoleFromToken(token);
+
+                response.setUserId(userId);
+                response.setEmail(email);
+                response.setRole(role);
+                response.setMessage("Token is valid");
+            } else {
+                response.setMessage("Token is expired");
+            }
+        } catch (Exception e) {
+            response.setValid(false);
+            response.setExpired(true);
+            response.setMessage("Invalid token: " + e.getMessage());
+        }
+
+        return response;
     }
 }
 

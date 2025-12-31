@@ -41,6 +41,9 @@ public class DoctorLeaveRequest {
     @JoinColumn(name = "approved_by")
     private User approvedBy;
 
+    @Column(name = "approved_at")
+    private LocalDateTime approvedAt;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();

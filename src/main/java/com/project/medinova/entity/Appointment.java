@@ -29,8 +29,8 @@ public class Appointment {
     @JoinColumn(name = "clinic_id", nullable = false)
     private Clinic clinic;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "schedule_id", nullable = false)
+    @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @JoinColumn(name = "schedule_id", nullable = false, unique = true)
     private DoctorSchedule schedule;
 
     @Column(name = "appointment_time", nullable = false)
@@ -38,6 +38,15 @@ public class Appointment {
 
     @Column(nullable = false)
     private String status; // PENDING | CONFIRMED | COMPLETED | CANCELLED
+
+    @Column(name = "age")
+    private Integer age;
+
+    @Column(name = "gender")
+    private String gender; // MALE | FEMALE | OTHER
+
+    @Column(name = "symptoms", columnDefinition = "TEXT")
+    private String symptoms;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;

@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -15,5 +16,6 @@ public interface DoctorScheduleRepository extends JpaRepository<DoctorSchedule, 
     List<DoctorSchedule> findByDoctorIdAndWorkDateBetween(Long doctorId, LocalDate startDate, LocalDate endDate);
     List<DoctorSchedule> findByStatus(String status);
     List<DoctorSchedule> findByDoctorIdAndStatus(Long doctorId, String status);
+    List<DoctorSchedule> findByStatusAndHoldExpiresAtBefore(String status, LocalDateTime now);
 }
 

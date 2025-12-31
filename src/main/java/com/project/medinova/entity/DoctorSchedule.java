@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 @Entity
@@ -36,6 +37,12 @@ public class DoctorSchedule {
     private LocalTime endTime;
 
     @Column(nullable = false)
-    private String status; // AVAILABLE | BOOKED | BLOCKED
+    private String status; // AVAILABLE | HOLD | BOOKED | BLOCKED
+
+    @Column(name = "hold_expires_at")
+    private LocalDateTime holdExpiresAt;
+
+    @OneToOne(mappedBy = "schedule", fetch = FetchType.LAZY)
+    private Appointment appointment;
 }
 

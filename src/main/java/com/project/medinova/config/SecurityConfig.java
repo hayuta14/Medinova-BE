@@ -50,6 +50,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/public/**").permitAll()
                         .requestMatchers("/api/doctors/search").permitAll()
+                        .requestMatchers("/api/appointments/doctors/*/busy-schedules").permitAll()
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/swagger-ui/index.html").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-resources/**", "/swagger-resources").permitAll()
                         .requestMatchers("/webjars/**", "/favicon.ico").permitAll()

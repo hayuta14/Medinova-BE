@@ -5,6 +5,7 @@ import com.project.medinova.dto.BusyScheduleResponse;
 import com.project.medinova.dto.ConfirmAppointmentRequest;
 import com.project.medinova.dto.CreateAppointmentRequest;
 import com.project.medinova.dto.UpdateAppointmentStatusRequest;
+import com.project.medinova.dto.UpdateAppointmentNotesRequest;
 import com.project.medinova.service.AppointmentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -82,6 +83,40 @@ public class AppointmentController {
     }
 
     @Operation(
+            summary = "Get all appointments (ADMIN only)",
+            description = "Get all appointments with optional status filter and pagination. Only ADMIN can access all appointments. Orders appointments: future/current appointments (>= now) first in ascending order, then past appointments (< now) in descending order."
+    )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200", 
+                    description = "Appointments retrieved successfully",
+                    content = @io.swagger.v3.oas.annotations.media.Content(
+                            schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = Page.class)
+                    )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Bad request - Invalid pagination parameters"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden - Only ADMIN can access all appointments")
+    })
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/all")
+    public ResponseEntity<Page<AppointmentResponse>> getAllAppointments(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false, defaultValue = "0") int page,
+            @RequestParam(required = false, defaultValue = "10") int size) {
+        
+        // Validate pagination parameters
+        if (page < 0) page = 0;
+        if (size < 1) size = 10;
+        if (size > 100) size = 100; // Limit max page size
+        
+        Pageable pageable = PageRequest.of(page, size);
+        Page<AppointmentResponse> appointments = appointmentService.getAllAppointments(status, pageable);
+        
+        return ResponseEntity.ok(appointments);
+    }
+
+    @Operation(
             summary = "Get doctor appointments with paging",
             description = "Get all appointments for a specific doctor with pagination. Orders appointments: future/current appointments (>= now) first in ascending order, then past appointments (< now) in descending order. Can filter by status (PENDING, CONFIRMED, COMPLETED, CANCELLED). Returns paginated results with appointment details."
     )
@@ -135,7 +170,7 @@ public class AppointmentController {
     }
 
     @Operation(
-            summary = "Update appointment status",
+            summary = "Update appointment status (Patient)",
             description = "Update the status of an appointment. Patients can only cancel their own appointments. The appointment must not be completed or already cancelled. When cancelled, the schedule slot will be made available again if the appointment time has not passed."
     )
     @ApiResponses(value = {
@@ -151,6 +186,26 @@ public class AppointmentController {
             @PathVariable Long id,
             @Valid @RequestBody UpdateAppointmentStatusRequest request) {
         AppointmentResponse appointment = appointmentService.updateAppointmentStatus(id, request);
+        return ResponseEntity.ok(appointment);
+    }
+
+    @Operation(
+            summary = "Update appointment status (Doctor)",
+            description = "Update the status of an appointment assigned to the current doctor. Doctors can mark appointments as COMPLETED or update other statuses. Only appointments assigned to the current doctor can be updated."
+    )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Appointment status updated successfully"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Bad request - Invalid status or appointment not assigned to doctor"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden - Can only update appointments assigned to you"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Appointment not found")
+    })
+    @PreAuthorize("hasRole('DOCTOR')")
+    @PutMapping("/{id}/status/doctor")
+    public ResponseEntity<AppointmentResponse> updateAppointmentStatusByDoctor(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateAppointmentStatusRequest request) {
+        AppointmentResponse appointment = appointmentService.updateAppointmentStatusByDoctor(id, request);
         return ResponseEntity.ok(appointment);
     }
 
@@ -171,6 +226,26 @@ public class AppointmentController {
             @PathVariable Long id,
             @RequestBody(required = false) ConfirmAppointmentRequest request) {
         AppointmentResponse appointment = appointmentService.confirmAppointment(id, request);
+        return ResponseEntity.ok(appointment);
+    }
+
+    @Operation(
+            summary = "Update appointment consultation notes (Doctor)",
+            description = "Update consultation notes, diagnosis, and treatment plan for an appointment. Only doctors assigned to the appointment can update notes."
+    )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Appointment notes updated successfully"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Bad request"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden - Can only update notes for appointments assigned to you"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Appointment not found")
+    })
+    @PreAuthorize("hasRole('DOCTOR')")
+    @PutMapping("/{id}/notes")
+    public ResponseEntity<AppointmentResponse> updateAppointmentNotes(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateAppointmentNotesRequest request) {
+        AppointmentResponse appointment = appointmentService.updateAppointmentNotes(id, request);
         return ResponseEntity.ok(appointment);
     }
 }

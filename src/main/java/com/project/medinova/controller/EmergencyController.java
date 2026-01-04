@@ -51,7 +51,7 @@ public class EmergencyController {
 
     @Operation(
             summary = "Get emergency by ID",
-            description = "Get emergency request information by ID including assigned ambulance and doctor"
+            description = "Get emergency request information by ID including assigned ambulance and doctor. Patients can only view their own emergencies, while ADMIN and DOCTOR can view any emergency."
     )
     @ApiResponses(value = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -60,9 +60,10 @@ public class EmergencyController {
                     content = @Content(schema = @Schema(implementation = EmergencyResponse.class))
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden - Cannot view other patients' emergencies"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Emergency not found")
     })
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR')")
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/{id}")
     public ResponseEntity<EmergencyResponse> getEmergencyById(@PathVariable Long id) {
         EmergencyResponse response = emergencyService.getEmergencyById(id);
@@ -112,6 +113,26 @@ public class EmergencyController {
     }
 
     @Operation(
+            summary = "Get my emergencies (current patient)",
+            description = "Get all emergency cases created by the currently authenticated patient. Can filter by status (PENDING, DISPATCHED, IN_TRANSIT, COMPLETED, CANCELLED). Results are sorted by creation time (newest first)."
+    )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "List of emergencies retrieved successfully"
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden - Only patients can access")
+    })
+    @PreAuthorize("hasRole('PATIENT')")
+    @GetMapping("/my-patient-emergencies")
+    public ResponseEntity<List<EmergencyResponse>> getMyPatientEmergencies(
+            @RequestParam(required = false) String status) {
+        List<EmergencyResponse> responses = emergencyService.getMyPatientEmergencies(status);
+        return ResponseEntity.ok(responses);
+    }
+
+    @Operation(
             summary = "Manually assign doctor and ambulance to emergency",
             description = "Manually assign a specific doctor and ambulance to an emergency. Use this when automatic assignment failed or needs to be changed. The doctor must be available (no active emergencies or ongoing appointments) and the ambulance must be AVAILABLE. Ambulance is optional - can be null if no ambulance is available."
     )
@@ -157,6 +178,26 @@ public class EmergencyController {
             @Valid @RequestBody UpdateEmergencyStatusRequest request) {
         EmergencyResponse response = emergencyService.updateEmergencyStatus(id, request);
         return ResponseEntity.ok(response);
+    }
+
+    @Operation(
+            summary = "Get all emergencies (ADMIN only)",
+            description = "Get all emergency cases with optional status filter. Results are sorted by creation time (newest first). Only ADMIN can access all emergencies."
+    )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "List of emergencies retrieved successfully"
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden - Only ADMIN can access all emergencies")
+    })
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/all")
+    public ResponseEntity<List<EmergencyResponse>> getAllEmergencies(
+            @RequestParam(required = false) String status) {
+        List<EmergencyResponse> responses = emergencyService.getAllEmergencies(status);
+        return ResponseEntity.ok(responses);
     }
 }
 

@@ -11,6 +11,8 @@ public interface EmergencyRepository extends JpaRepository<Emergency, Long> {
     List<Emergency> findByClinicId(Long clinicId);
     List<Emergency> findByStatus(String status);
     List<Emergency> findByClinicIdAndStatus(Long clinicId, String status);
+    List<Emergency> findByPatientId(Long patientId);
+    List<Emergency> findByPatientIdAndStatus(Long patientId, String status);
 }
 
 

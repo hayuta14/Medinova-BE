@@ -81,9 +81,18 @@ public class EmergencyService {
             }
         }
 
+        // Lấy user hiện tại nếu có (để link với patient)
+        User currentUser = null;
+        try {
+            currentUser = authService.getCurrentUser();
+        } catch (Exception e) {
+            // Nếu không có user authenticated, vẫn tạo emergency với thông tin từ request
+        }
+
         // Tạo emergency request
         Emergency emergency = new Emergency();
         emergency.setClinic(clinic);
+        emergency.setPatient(currentUser); // Link với user nếu có
         emergency.setPatientLat(request.getPatientLat());
         emergency.setPatientLng(request.getPatientLng());
         emergency.setPatientAddress(request.getPatientAddress());
@@ -421,6 +430,15 @@ public class EmergencyService {
         Emergency emergency = emergencyRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Emergency not found with id: " + id));
 
+        // Kiểm tra quyền truy cập: PATIENT chỉ có thể xem emergency của chính họ
+        User currentUser = authService.getCurrentUser();
+        if (currentUser != null && "PATIENT".equals(currentUser.getRole())) {
+            // Nếu emergency không có patient hoặc patient không phải là user hiện tại
+            if (emergency.getPatient() == null || !emergency.getPatient().getId().equals(currentUser.getId())) {
+                throw new ForbiddenException("Access denied. You can only view your own emergencies.");
+            }
+        }
+
         EmergencyAssignment assignment = assignmentRepository.findByEmergencyId(id)
                 .stream()
                 .findFirst()
@@ -492,6 +510,52 @@ public class EmergencyService {
 
         // Lấy emergencies của doctor này
         return getEmergenciesByDoctorId(doctor.getId(), status);
+    }
+
+    /**
+     * Get all emergencies created by the current patient
+     */
+    public List<EmergencyResponse> getMyPatientEmergencies(String status) {
+        // Lấy user hiện tại
+        User currentUser = authService.getCurrentUser();
+        if (currentUser == null) {
+            throw new UnauthorizedException("User not authenticated");
+        }
+
+        // Kiểm tra user có role PATIENT
+        if (!"PATIENT".equals(currentUser.getRole())) {
+            throw new ForbiddenException("Only patients can access their emergencies");
+        }
+
+        // Lấy emergencies của patient này
+        List<Emergency> emergencies;
+        if (status != null && !status.trim().isEmpty()) {
+            emergencies = emergencyRepository.findByPatientIdAndStatus(currentUser.getId(), status);
+        } else {
+            emergencies = emergencyRepository.findByPatientId(currentUser.getId());
+        }
+
+        // Convert to DTO và sắp xếp theo thời gian (mới nhất trước)
+        return emergencies.stream()
+                .map(emergency -> {
+                    // Lấy assignment nếu có
+                    List<EmergencyAssignment> assignments = assignmentRepository.findByEmergencyId(emergency.getId());
+                    EmergencyAssignment assignment = assignments.isEmpty() ? null : assignments.get(0);
+                    
+                    Doctor doctor = assignment != null ? assignment.getDoctor() : null;
+                    Ambulance ambulance = assignment != null ? assignment.getAmbulance() : null;
+                    Double distance = assignment != null ? assignment.getDistanceKm() : null;
+                    
+                    return toEmergencyResponse(emergency, ambulance, doctor, distance);
+                })
+                .sorted((a, b) -> {
+                    // Sắp xếp theo createdAt (mới nhất trước)
+                    if (a.getCreatedAt() != null && b.getCreatedAt() != null) {
+                        return b.getCreatedAt().compareTo(a.getCreatedAt());
+                    }
+                    return 0;
+                })
+                .collect(Collectors.toList());
     }
 
     /**
@@ -706,6 +770,40 @@ public class EmergencyService {
         Double distance = assignment != null ? assignment.getDistanceKm() : null;
 
         return toEmergencyResponse(emergency, ambulance, doctor, distance);
+    }
+
+    /**
+     * Get all emergencies with optional status filter (ADMIN only)
+     */
+    public List<EmergencyResponse> getAllEmergencies(String status) {
+        List<Emergency> emergencies;
+        
+        if (status != null && !status.trim().isEmpty()) {
+            emergencies = emergencyRepository.findByStatus(status);
+        } else {
+            emergencies = emergencyRepository.findAll();
+        }
+        
+        // Convert to DTO và sắp xếp theo thời gian (mới nhất trước)
+        return emergencies.stream()
+                .map(emergency -> {
+                    List<EmergencyAssignment> assignments = assignmentRepository.findByEmergencyId(emergency.getId());
+                    EmergencyAssignment assignment = assignments.isEmpty() ? null : assignments.get(0);
+                    
+                    Doctor doctor = assignment != null ? assignment.getDoctor() : null;
+                    Ambulance ambulance = assignment != null ? assignment.getAmbulance() : null;
+                    Double distance = assignment != null ? assignment.getDistanceKm() : null;
+                    
+                    return toEmergencyResponse(emergency, ambulance, doctor, distance);
+                })
+                .sorted((a, b) -> {
+                    // Sắp xếp theo createdAt (mới nhất trước)
+                    if (a.getCreatedAt() != null && b.getCreatedAt() != null) {
+                        return b.getCreatedAt().compareTo(a.getCreatedAt());
+                    }
+                    return 0;
+                })
+                .collect(Collectors.toList());
     }
 }
 

@@ -6,6 +6,7 @@ import com.project.medinova.dto.ConfirmAppointmentRequest;
 import com.project.medinova.dto.CreateAppointmentRequest;
 import com.project.medinova.dto.HoldSlotRequest;
 import com.project.medinova.dto.UpdateAppointmentStatusRequest;
+import com.project.medinova.dto.UpdateAppointmentNotesRequest;
 import com.project.medinova.entity.Appointment;
 import com.project.medinova.entity.Doctor;
 import com.project.medinova.entity.DoctorLeaveRequest;
@@ -101,6 +102,7 @@ public class AppointmentService {
         response.setAge(appointment.getAge());
         response.setGender(appointment.getGender());
         response.setSymptoms(appointment.getSymptoms());
+        response.setNotes(appointment.getNotes());
         response.setCreatedAt(appointment.getCreatedAt());
         
         return response;
@@ -450,6 +452,76 @@ public class AppointmentService {
     }
 
     /**
+     * Update appointment status by doctor
+     * Doctors can mark appointments as COMPLETED or update other statuses
+     */
+    public AppointmentResponse updateAppointmentStatusByDoctor(Long id, UpdateAppointmentStatusRequest request) {
+        // Lấy user hiện tại từ JWT
+        User currentUser = authService.getCurrentUser();
+        if (currentUser == null) {
+            throw new ForbiddenException("User not authenticated");
+        }
+
+        // Kiểm tra user có role DOCTOR
+        if (!"DOCTOR".equals(currentUser.getRole())) {
+            throw new ForbiddenException("Only doctors can update appointment status");
+        }
+
+        // Tìm doctor profile
+        Doctor doctor = doctorRepository.findByUserId(currentUser.getId())
+                .orElseThrow(() -> new NotFoundException("Doctor profile not found"));
+
+        // Tìm appointment
+        Appointment appointment = appointmentRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Appointment not found with id: " + id));
+
+        // Kiểm tra appointment được assign cho doctor hiện tại
+        if (!appointment.getDoctor().getId().equals(doctor.getId())) {
+            throw new ForbiddenException("You can only update appointments assigned to you");
+        }
+
+        // Validate status
+        String newStatus = request.getStatus();
+        String[] allowedStatuses = {"PENDING", "CONFIRMED", "COMPLETED", "CANCELLED"};
+        boolean isValidStatus = false;
+        for (String status : allowedStatuses) {
+            if (status.equals(newStatus)) {
+                isValidStatus = true;
+                break;
+            }
+        }
+
+        if (!isValidStatus) {
+            throw new BadRequestException("Invalid status: " + newStatus);
+        }
+
+        // Kiểm tra không thể update nếu đã completed hoặc cancelled (trừ khi đang set lại)
+        String currentStatus = appointment.getStatus();
+        if ("COMPLETED".equals(currentStatus) && !"COMPLETED".equals(newStatus)) {
+            throw new BadRequestException("Cannot change status of a completed appointment");
+        }
+
+        if ("CANCELLED".equals(currentStatus) && !"CANCELLED".equals(newStatus)) {
+            throw new BadRequestException("Cannot change status of a cancelled appointment");
+        }
+
+        // Cập nhật status
+        appointment.setStatus(newStatus);
+
+        // Nếu complete, có thể cập nhật schedule status
+        if ("COMPLETED".equals(newStatus)) {
+            DoctorSchedule schedule = appointment.getSchedule();
+            if (schedule != null) {
+                schedule.setStatus("COMPLETED");
+                scheduleRepository.save(schedule);
+            }
+        }
+
+        Appointment savedAppointment = appointmentRepository.save(appointment);
+        return toAppointmentResponse(savedAppointment);
+    }
+
+    /**
      * Get all appointments of the current authenticated user
      * Patients see their own appointments, doctors see appointments assigned to them
      */
@@ -584,6 +656,83 @@ public class AppointmentService {
                 .collect(Collectors.toList());
 
         return new PageImpl<>(content, pageable, appointmentPage.getTotalElements());
+    }
+
+    /**
+     * Get all appointments with pagination (ADMIN only)
+     */
+    public Page<AppointmentResponse> getAllAppointments(String status, Pageable pageable) {
+        List<Appointment> appointments;
+        
+        if (status != null && !status.trim().isEmpty()) {
+            appointments = appointmentRepository.findByStatus(status);
+        } else {
+            appointments = appointmentRepository.findAll();
+        }
+        
+        // Sort: future/current appointments first (ascending), then past appointments (descending)
+        LocalDateTime now = LocalDateTime.now();
+        List<Appointment> futureAppointments = appointments.stream()
+                .filter(apt -> apt.getAppointmentTime() != null && apt.getAppointmentTime().isAfter(now) || apt.getAppointmentTime().isEqual(now))
+                .sorted((a, b) -> a.getAppointmentTime().compareTo(b.getAppointmentTime()))
+                .collect(Collectors.toList());
+        
+        List<Appointment> pastAppointments = appointments.stream()
+                .filter(apt -> apt.getAppointmentTime() != null && apt.getAppointmentTime().isBefore(now))
+                .sorted((a, b) -> b.getAppointmentTime().compareTo(a.getAppointmentTime()))
+                .collect(Collectors.toList());
+        
+        List<Appointment> sortedAppointments = new ArrayList<>();
+        sortedAppointments.addAll(futureAppointments);
+        sortedAppointments.addAll(pastAppointments);
+        
+        // Apply pagination
+        int start = (int) pageable.getOffset();
+        int end = Math.min((start + pageable.getPageSize()), sortedAppointments.size());
+        List<Appointment> paginatedAppointments = sortedAppointments.subList(start, end);
+        
+        // Convert to DTO
+        List<AppointmentResponse> content = paginatedAppointments.stream()
+                .map(this::toAppointmentResponse)
+                .collect(Collectors.toList());
+        
+        return new PageImpl<>(content, pageable, sortedAppointments.size());
+    }
+
+    /**
+     * Update appointment consultation notes by doctor
+     * Doctors can add consultation notes, diagnosis, and treatment plan
+     */
+    public AppointmentResponse updateAppointmentNotes(Long id, UpdateAppointmentNotesRequest request) {
+        // Lấy user hiện tại từ JWT
+        User currentUser = authService.getCurrentUser();
+        if (currentUser == null) {
+            throw new ForbiddenException("User not authenticated");
+        }
+
+        // Kiểm tra user có role DOCTOR
+        if (!"DOCTOR".equals(currentUser.getRole())) {
+            throw new ForbiddenException("Only doctors can update appointment notes");
+        }
+
+        // Tìm doctor profile
+        Doctor doctor = doctorRepository.findByUserId(currentUser.getId())
+                .orElseThrow(() -> new NotFoundException("Doctor profile not found"));
+
+        // Tìm appointment
+        Appointment appointment = appointmentRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Appointment not found with id: " + id));
+
+        // Kiểm tra appointment được assign cho doctor hiện tại
+        if (!appointment.getDoctor().getId().equals(doctor.getId())) {
+            throw new ForbiddenException("You can only update notes for appointments assigned to you");
+        }
+
+        // Cập nhật notes
+        appointment.setNotes(request.getNotes());
+
+        Appointment savedAppointment = appointmentRepository.save(appointment);
+        return toAppointmentResponse(savedAppointment);
     }
 }
 

@@ -41,6 +41,7 @@ public class AppointmentResponse {
     private Integer age;
     private String gender; // MALE | FEMALE | OTHER
     private String symptoms;
+    private String notes; // Doctor's consultation notes
     private LocalDateTime createdAt;
 }
 

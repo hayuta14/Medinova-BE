@@ -14,5 +14,6 @@ public interface DoctorLeaveRequestRepository extends JpaRepository<DoctorLeaveR
     List<DoctorLeaveRequest> findByDoctorIdAndStatus(Long doctorId, String status);
     List<DoctorLeaveRequest> findByStartDateLessThanEqualAndEndDateGreaterThanEqualAndStatus(
             LocalDate endDate, LocalDate startDate, String status);
+    long countByStatus(String status);
 }
 

@@ -96,6 +96,7 @@ public class UserService {
                 Doctor doctor = new Doctor();
                 doctor.setUser(user);
                 doctor.setClinic(clinic);
+                doctor.setStatus("PENDING"); // Mặc định là PENDING khi admin chuyển role
                 // Các field khác có thể để null, admin có thể update sau
                 doctorRepository.save(doctor);
             } catch (Exception e) {

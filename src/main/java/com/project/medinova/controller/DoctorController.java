@@ -2,6 +2,7 @@ package com.project.medinova.controller;
 
 import com.project.medinova.dto.CreateDoctorRequest;
 import com.project.medinova.dto.UpdateDoctorRequest;
+import com.project.medinova.dto.UpdateDoctorStatusRequest;
 import com.project.medinova.entity.Doctor;
 import com.project.medinova.service.DoctorService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -19,7 +20,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/doctors")
@@ -206,6 +209,58 @@ public class DoctorController {
     public ResponseEntity<Void> deleteDoctor(@PathVariable Long id) {
         doctorService.deleteDoctor(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @Operation(
+            summary = "Get pending doctors",
+            description = "Get all doctors with PENDING status. Includes total count of pending doctors. (ADMIN only)",
+            tags = {"Doctor Management"}
+    )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "Pending doctors retrieved successfully",
+                    content = @Content(schema = @Schema(implementation = Map.class))
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized - Invalid or missing JWT token"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden - Only ADMIN can access")
+    })
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/pending")
+    public ResponseEntity<Map<String, Object>> getPendingDoctors() {
+        List<Doctor> pendingDoctors = doctorService.getPendingDoctors();
+        long totalPendingCount = doctorService.getPendingDoctorsCount();
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("doctors", pendingDoctors);
+        response.put("totalPendingCount", totalPendingCount);
+        
+        return ResponseEntity.ok(response);
+    }
+
+    @Operation(
+            summary = "Update doctor status",
+            description = "Update doctor status (APPROVED or REJECTED). (ADMIN only)",
+            tags = {"Doctor Management"}
+    )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "Doctor status updated successfully",
+                    content = @Content(schema = @Schema(implementation = Doctor.class))
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized - Invalid or missing JWT token"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden - Only ADMIN can update doctor status"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Not Found - Doctor not found"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Bad Request - Validation error or invalid status")
+    })
+    @PreAuthorize("hasRole('ADMIN')")
+    @PutMapping("/{id}/status")
+    public ResponseEntity<Doctor> updateDoctorStatus(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateDoctorStatusRequest request) {
+        Doctor doctor = doctorService.updateDoctorStatus(id, request.getStatus());
+        return ResponseEntity.ok(doctor);
     }
 }
 

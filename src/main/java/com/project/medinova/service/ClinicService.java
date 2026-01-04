@@ -39,6 +39,10 @@ public class ClinicService {
         clinic.setAddress(request.getAddress());
         clinic.setPhone(request.getPhone());
         clinic.setDescription(request.getDescription());
+        clinic.setLatitude(request.getLatitude());
+        clinic.setLongitude(request.getLongitude());
+        clinic.setIsActive(request.getIsActive() != null ? request.getIsActive() : true);
+        clinic.setEmergencyEnabled(request.getEmergencyEnabled() != null ? request.getEmergencyEnabled() : true);
 
         return clinicRepository.save(clinic);
     }
@@ -71,6 +75,18 @@ public class ClinicService {
         }
         if (request.getDescription() != null) {
             clinic.setDescription(request.getDescription());
+        }
+        if (request.getLatitude() != null) {
+            clinic.setLatitude(request.getLatitude());
+        }
+        if (request.getLongitude() != null) {
+            clinic.setLongitude(request.getLongitude());
+        }
+        if (request.getIsActive() != null) {
+            clinic.setIsActive(request.getIsActive());
+        }
+        if (request.getEmergencyEnabled() != null) {
+            clinic.setEmergencyEnabled(request.getEmergencyEnabled());
         }
 
         return clinicRepository.save(clinic);

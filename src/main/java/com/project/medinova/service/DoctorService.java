@@ -62,6 +62,7 @@ public class DoctorService {
         doctor.setBio(request.getBio());
         doctor.setDefaultStartTime(request.getDefaultStartTime());
         doctor.setDefaultEndTime(request.getDefaultEndTime());
+        doctor.setStatus("APPROVED"); // Admin tạo nên mặc định là APPROVED
 
         return doctorRepository.save(doctor);
     }
@@ -142,10 +143,12 @@ public class DoctorService {
 
         // Kiểm tra quyền: DOCTOR chỉ có thể update chính mình, ADMIN có thể update bất kỳ
         var currentUser = authService.getCurrentUser();
+        boolean isDoctorUpdatingSelf = false;
         if (currentUser != null && "DOCTOR".equals(currentUser.getRole())) {
             if (!doctor.getUser().getId().equals(currentUser.getId())) {
                 throw new ForbiddenException("Doctors can only update their own information");
             }
+            isDoctorUpdatingSelf = true;
         }
 
         if (request.getClinicId() != null) {
@@ -170,6 +173,11 @@ public class DoctorService {
             doctor.setDefaultEndTime(request.getDefaultEndTime());
         }
 
+        // Nếu doctor tự update profile, set status về PENDING
+        if (isDoctorUpdatingSelf) {
+            doctor.setStatus("PENDING");
+        }
+
         return doctorRepository.save(doctor);
     }
 
@@ -178,6 +186,26 @@ public class DoctorService {
                 .orElseThrow(() -> new NotFoundException("Doctor not found with id: " + id));
 
         doctorRepository.delete(doctor);
+    }
+
+    public List<Doctor> getPendingDoctors() {
+        return doctorRepository.findByStatus("PENDING");
+    }
+
+    public long getPendingDoctorsCount() {
+        return doctorRepository.countByStatus("PENDING");
+    }
+
+    public Doctor updateDoctorStatus(Long id, String status) {
+        Doctor doctor = doctorRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Doctor not found with id: " + id));
+
+        if (!"APPROVED".equals(status) && !"REJECTED".equals(status)) {
+            throw new BadRequestException("Status must be either APPROVED or REJECTED");
+        }
+
+        doctor.setStatus(status);
+        return doctorRepository.save(doctor);
     }
 }
 

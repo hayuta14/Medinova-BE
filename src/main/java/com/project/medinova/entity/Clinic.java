@@ -22,10 +22,22 @@ public class Clinic {
 
     private String address;
 
+    @Column(name = "latitude")
+    private Double latitude;
+
+    @Column(name = "longitude")
+    private Double longitude;
+
     private String phone;
 
     @Column(columnDefinition = "TEXT")
     private String description;
+
+    @Column(name = "is_active")
+    private Boolean isActive; // Clinic có đang hoạt động không
+
+    @Column(name = "emergency_enabled")
+    private Boolean emergencyEnabled; // Clinic có thể xử lý emergency không
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
@@ -33,6 +45,12 @@ public class Clinic {
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
+        if (isActive == null) {
+            isActive = true; // Mặc định là active
+        }
+        if (emergencyEnabled == null) {
+            emergencyEnabled = true; // Mặc định có thể xử lý emergency
+        }
     }
 }
 

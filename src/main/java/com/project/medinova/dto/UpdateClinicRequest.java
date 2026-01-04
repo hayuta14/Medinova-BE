@@ -1,5 +1,6 @@
 package com.project.medinova.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -19,5 +20,17 @@ public class UpdateClinicRequest {
     private String phone;
 
     private String description;
+
+    @Schema(description = "Latitude of the clinic location", example = "10.762622")
+    private Double latitude;
+
+    @Schema(description = "Longitude of the clinic location", example = "106.660172")
+    private Double longitude;
+
+    @Schema(description = "Whether the clinic is active", example = "true")
+    private Boolean isActive;
+
+    @Schema(description = "Whether the clinic can handle emergency requests", example = "true")
+    private Boolean emergencyEnabled;
 }
 

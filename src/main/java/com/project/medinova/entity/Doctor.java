@@ -38,5 +38,8 @@ public class Doctor {
 
     @Column(name = "default_end_time")
     private LocalTime defaultEndTime;
+
+    @Column(nullable = false)
+    private String status; // PENDING | APPROVED | REJECTED
 }
 

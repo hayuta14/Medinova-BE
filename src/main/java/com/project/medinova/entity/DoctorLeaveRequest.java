@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 @Entity
 @Table(name = "doctor_leave_requests")
@@ -27,6 +28,12 @@ public class DoctorLeaveRequest {
 
     @Column(name = "end_date", nullable = false)
     private LocalDate endDate;
+
+    @Column(name = "start_time")
+    private LocalTime startTime;
+
+    @Column(name = "end_time")
+    private LocalTime endTime;
 
     @Column(columnDefinition = "TEXT")
     private String reason;

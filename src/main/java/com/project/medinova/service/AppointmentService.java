@@ -372,9 +372,17 @@ public class AppointmentService {
             response.setType("LEAVE");
             response.setStartDate(leave.getStartDate());
             response.setEndDate(leave.getEndDate());
-            // Set startDateTime và endDateTime cho cả ngày
-            response.setStartDateTime(leave.getStartDate().atStartOfDay());
-            response.setEndDateTime(leave.getEndDate().atTime(23, 59, 59));
+            
+            // Nếu có startTime và endTime, sử dụng chúng (partial day leave)
+            if (leave.getStartTime() != null && leave.getEndTime() != null) {
+                response.setStartDateTime(LocalDateTime.of(leave.getStartDate(), leave.getStartTime()));
+                response.setEndDateTime(LocalDateTime.of(leave.getEndDate(), leave.getEndTime()));
+            } else {
+                // Nếu không có time, set cho cả ngày (full day leave)
+                response.setStartDateTime(leave.getStartDate().atStartOfDay());
+                response.setEndDateTime(leave.getEndDate().atTime(23, 59, 59));
+            }
+            
             response.setReason(leave.getReason() != null ? leave.getReason() : "Approved leave");
             response.setLeaveRequestId(leave.getId());
             busySchedules.add(response);

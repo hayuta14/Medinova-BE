@@ -3,6 +3,7 @@ package com.project.medinova.controller;
 import com.project.medinova.dto.CreateDoctorRequest;
 import com.project.medinova.dto.UpdateDoctorRequest;
 import com.project.medinova.dto.UpdateDoctorStatusRequest;
+import com.project.medinova.entity.Department;
 import com.project.medinova.entity.Doctor;
 import com.project.medinova.service.DoctorService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -122,8 +123,8 @@ public class DoctorController {
     }
 
     @Operation(
-            summary = "Get doctors by specialization",
-            description = "Retrieve all doctors with a specific specialization (e.g., Cardiology, Neurology, Pediatrics).",
+            summary = "Get doctors by department",
+            description = "Retrieve all doctors in a specific department (e.g., CARDIOLOGY, NEUROLOGY, PEDIATRICS).",
             tags = {"Doctor Management"}
     )
     @ApiResponses(value = {
@@ -133,9 +134,29 @@ public class DoctorController {
                     content = @Content(schema = @Schema(implementation = Doctor.class))
             )
     })
-    @GetMapping("/specialization/{specialization}")
-    public ResponseEntity<List<Doctor>> getDoctorsBySpecialization(@PathVariable String specialization) {
-        List<Doctor> doctors = doctorService.getDoctorsBySpecialization(specialization);
+    @GetMapping("/department/{department}")
+    public ResponseEntity<List<Doctor>> getDoctorsByDepartment(@PathVariable Department department) {
+        List<Doctor> doctors = doctorService.getDoctorsByDepartment(department);
+        return ResponseEntity.ok(doctors);
+    }
+
+    @Operation(
+            summary = "Get doctors by clinic and department",
+            description = "Retrieve all doctors in a specific clinic and department.",
+            tags = {"Doctor Management"}
+    )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "Doctors retrieved successfully",
+                    content = @Content(schema = @Schema(implementation = Doctor.class))
+            )
+    })
+    @GetMapping("/clinic/{clinicId}/department/{department}")
+    public ResponseEntity<List<Doctor>> getDoctorsByClinicAndDepartment(
+            @PathVariable Long clinicId,
+            @PathVariable Department department) {
+        List<Doctor> doctors = doctorService.getDoctorsByClinicAndDepartment(clinicId, department);
         return ResponseEntity.ok(doctors);
     }
 

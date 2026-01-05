@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.project.medinova.dto.CreateDoctorRequest;
 import com.project.medinova.dto.UpdateDoctorRequest;
 import com.project.medinova.entity.Clinic;
+import com.project.medinova.entity.Department;
 import com.project.medinova.entity.Doctor;
 import com.project.medinova.entity.User;
 import com.project.medinova.exception.BadRequestException;
@@ -76,7 +77,7 @@ class DoctorControllerTest {
         doctor.setId(1L);
         doctor.setUser(user);
         doctor.setClinic(clinic);
-        doctor.setSpecialization("Cardiology");
+        doctor.setDepartment(Department.CARDIOLOGY);
         doctor.setExperienceYears(10);
         doctor.setBio("Experienced cardiologist");
         doctor.setDefaultStartTime(LocalTime.of(9, 0));
@@ -85,14 +86,14 @@ class DoctorControllerTest {
         createRequest = new CreateDoctorRequest();
         createRequest.setUserId(2L);
         createRequest.setClinicId(1L);
-        createRequest.setSpecialization("Cardiology");
+        createRequest.setDepartment(Department.CARDIOLOGY);
         createRequest.setExperienceYears(10);
         createRequest.setBio("Experienced cardiologist");
         createRequest.setDefaultStartTime(LocalTime.of(9, 0));
         createRequest.setDefaultEndTime(LocalTime.of(17, 0));
 
         updateRequest = new UpdateDoctorRequest();
-        updateRequest.setSpecialization("Neurology");
+        updateRequest.setDepartment(Department.NEUROLOGY);
         updateRequest.setExperienceYears(15);
     }
 
@@ -105,7 +106,7 @@ class DoctorControllerTest {
                         .content(objectMapper.writeValueAsString(createRequest)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(1L))
-                .andExpect(jsonPath("$.specialization").value("Cardiology"))
+                .andExpect(jsonPath("$.department").value("CARDIOLOGY"))
                 .andExpect(jsonPath("$.experienceYears").value(10));
     }
 
@@ -160,7 +161,7 @@ class DoctorControllerTest {
         mockMvc.perform(get("/api/doctors/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1L))
-                .andExpect(jsonPath("$.specialization").value("Cardiology"));
+                .andExpect(jsonPath("$.department").value("CARDIOLOGY"));
     }
 
     @Test
@@ -202,27 +203,27 @@ class DoctorControllerTest {
     }
 
     @Test
-    void testGetDoctorsBySpecialization_Success() throws Exception {
+    void testGetDoctorsByDepartment_Success() throws Exception {
         List<Doctor> doctors = Arrays.asList(doctor);
 
-        when(doctorService.getDoctorsBySpecialization("Cardiology")).thenReturn(doctors);
+        when(doctorService.getDoctorsByDepartment(Department.CARDIOLOGY)).thenReturn(doctors);
 
-        mockMvc.perform(get("/api/doctors/specialization/Cardiology"))
+        mockMvc.perform(get("/api/doctors/department/CARDIOLOGY"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray())
-                .andExpect(jsonPath("$[0].specialization").value("Cardiology"));
+                .andExpect(jsonPath("$[0].department").value("CARDIOLOGY"));
     }
 
     @Test
     void testUpdateDoctor_Success() throws Exception {
-        doctor.setSpecialization("Neurology");
+        doctor.setDepartment(Department.NEUROLOGY);
         when(doctorService.updateDoctor(eq(1L), any(UpdateDoctorRequest.class))).thenReturn(doctor);
 
         mockMvc.perform(put("/api/doctors/1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updateRequest)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.specialization").value("Neurology"));
+                .andExpect(jsonPath("$.department").value("NEUROLOGY"));
     }
 
     @Test
@@ -270,7 +271,7 @@ class DoctorControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content").isArray())
                 .andExpect(jsonPath("$.content[0].id").value(1L))
-                .andExpect(jsonPath("$.content[0].specialization").value("Cardiology"))
+                .andExpect(jsonPath("$.content[0].department").value("CARDIOLOGY"))
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.totalPages").value(1))
                 .andExpect(jsonPath("$.number").value(0))

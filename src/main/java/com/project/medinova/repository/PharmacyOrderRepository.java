@@ -15,3 +15,5 @@ public interface PharmacyOrderRepository extends JpaRepository<PharmacyOrder, Lo
     List<PharmacyOrder> findByClinicIdAndStatus(Long clinicId, String status);
 }
 
+
+

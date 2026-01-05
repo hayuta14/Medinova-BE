@@ -15,7 +15,8 @@ import java.util.Optional;
 public interface DoctorRepository extends JpaRepository<Doctor, Long> {
     Optional<Doctor> findByUserId(Long userId);
     List<Doctor> findByClinicId(Long clinicId);
-    List<Doctor> findBySpecialization(String specialization);
+    List<Doctor> findByDepartment(com.project.medinova.entity.Department department);
+    List<Doctor> findByClinicIdAndDepartment(Long clinicId, com.project.medinova.entity.Department department);
     List<Doctor> findByStatus(String status);
     long countByStatus(String status);
 

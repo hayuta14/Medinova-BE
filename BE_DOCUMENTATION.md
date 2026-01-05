@@ -88,7 +88,16 @@ src/main/java/com/project/medinova/
 │   ├── AppointmentController.java
 │   ├── EmergencyController.java
 │   ├── AmbulanceController.java
-│   └── LeaveRequestController.java
+│   ├── AmbulanceBookingController.java
+│   ├── LeaveRequestController.java
+│   ├── BloodTestController.java
+│   ├── PharmacyController.java
+│   ├── SurgeryController.java
+│   ├── PostController.java
+│   ├── ReviewController.java
+│   ├── RankingController.java
+│   ├── DashboardController.java
+│   └── PublicController.java
 │
 ├── service/                          # Business logic layer
 │   ├── AuthService.java
@@ -100,7 +109,16 @@ src/main/java/com/project/medinova/
 │   ├── AppointmentSchedulerService.java
 │   ├── EmergencyService.java
 │   ├── AmbulanceService.java
+│   ├── AmbulanceBookingService.java
 │   ├── LeaveRequestService.java
+│   ├── BloodTestService.java
+│   ├── PharmacyService.java
+│   ├── SurgeryService.java
+│   ├── PostService.java
+│   ├── ReviewService.java
+│   ├── RankingService.java
+│   ├── DashboardService.java
+│   ├── PublicService.java
 │   └── CustomUserDetailsService.java
 │
 ├── repository/                       # Data access layer
@@ -111,8 +129,20 @@ src/main/java/com/project/medinova/
 │   ├── AppointmentRepository.java
 │   ├── DoctorScheduleRepository.java
 │   ├── EmergencyRepository.java
+│   ├── EmergencyAssignmentRepository.java
 │   ├── AmbulanceRepository.java
-│   └── ...
+│   ├── AmbulanceBookingRepository.java
+│   ├── LeaveRequestRepository.java
+│   ├── BloodTestRepository.java
+│   ├── PharmacyOrderRepository.java
+│   ├── PharmacyOrderItemRepository.java
+│   ├── SurgeryConsultationRepository.java
+│   ├── PostRepository.java
+│   ├── PostCommentRepository.java
+│   ├── DoctorReviewRepository.java
+│   ├── PatientMedicalHistoryRepository.java
+│   ├── MedicalRecordRepository.java
+│   └── DoctorWorkingDaysRepository.java
 │
 ├── entity/                           # JPA Entities
 │   ├── User.java
@@ -125,7 +155,12 @@ src/main/java/com/project/medinova/
 │   ├── Emergency.java
 │   ├── EmergencyAssignment.java
 │   ├── Ambulance.java
+│   ├── AmbulanceBooking.java
 │   ├── DoctorLeaveRequest.java
+│   ├── BloodTest.java
+│   ├── PharmacyOrder.java
+│   ├── PharmacyOrderItem.java
+│   ├── SurgeryConsultation.java
 │   ├── MedicalRecord.java
 │   ├── PatientMedicalHistory.java
 │   ├── Post.java
@@ -290,6 +325,158 @@ src/main/java/com/project/medinova/
 - `GET /api/leave-requests` - Lấy danh sách (DOCTOR: của mình, ADMIN: tất cả)
 - `PUT /api/leave-requests/{id}/status` - Cập nhật status (ADMIN)
 
+### 10. Blood Test Module (`BloodTestController`, `BloodTestService`)
+
+**Chức năng:**
+- Tạo yêu cầu xét nghiệm máu (PATIENT)
+- Quản lý lịch xét nghiệm
+- Upload kết quả xét nghiệm
+
+**Endpoints:**
+- `POST /api/blood-tests` - Tạo yêu cầu xét nghiệm (PATIENT)
+- `GET /api/blood-tests/{id}` - Lấy test theo ID
+- `GET /api/blood-tests/my-tests` - Lấy tests của tôi (PATIENT)
+- `GET /api/blood-tests` - Lấy tất cả tests (ADMIN/DOCTOR, filter by status)
+- `GET /api/blood-tests/clinics/{clinicId}` - Lấy tests theo clinic (ADMIN/DOCTOR)
+- `PUT /api/blood-tests/{id}/status` - Cập nhật status (ADMIN/DOCTOR)
+- `PUT /api/blood-tests/{id}/result` - Upload kết quả (ADMIN/DOCTOR)
+
+**Test Types:**
+- Complete Blood Count (CBC): $50
+- Blood Glucose Test: $30
+- Lipid Panel: $60
+- Liver Function Test: $70
+- Thyroid Function Test: $80
+- Vitamin D Test: $90
+
+**Status Flow:**
+```
+PENDING → SCHEDULED → COMPLETED
+                ↓
+            CANCELLED
+```
+
+### 11. Pharmacy Order Module (`PharmacyController`, `PharmacyService`)
+
+**Chức năng:**
+- Tạo đơn hàng dược phẩm (PATIENT)
+- Quản lý đơn hàng
+- Link với appointment hoặc upload prescription
+
+**Endpoints:**
+- `POST /api/pharmacy-orders` - Tạo đơn hàng (PATIENT)
+- `GET /api/pharmacy-orders/{id}` - Lấy đơn hàng theo ID
+- `GET /api/pharmacy-orders/my-orders` - Lấy đơn hàng của tôi (PATIENT)
+- `GET /api/pharmacy-orders` - Lấy tất cả đơn hàng (ADMIN/DOCTOR, filter by status)
+- `GET /api/pharmacy-orders/clinics/{clinicId}` - Lấy đơn hàng theo clinic (ADMIN/DOCTOR)
+- `PUT /api/pharmacy-orders/{id}/status` - Cập nhật status (ADMIN/DOCTOR)
+
+**Status Flow:**
+```
+PENDING → PROCESSING → READY → OUT_FOR_DELIVERY → DELIVERED
+                ↓
+            CANCELLED
+```
+
+### 12. Surgery Consultation Module (`SurgeryController`, `SurgeryService`)
+
+**Chức năng:**
+- Tạo yêu cầu tư vấn phẫu thuật (PATIENT)
+- Phân công bác sĩ
+- Quản lý consultation notes
+
+**Endpoints:**
+- `POST /api/surgery-consultations` - Tạo yêu cầu tư vấn (PATIENT)
+- `GET /api/surgery-consultations/{id}` - Lấy consultation theo ID
+- `GET /api/surgery-consultations/my-consultations` - Lấy consultations của tôi (PATIENT)
+- `GET /api/surgery-consultations` - Lấy tất cả consultations (ADMIN/DOCTOR, filter by status)
+- `GET /api/surgery-consultations/doctors/{doctorId}` - Lấy consultations theo doctor (ADMIN/DOCTOR)
+- `PUT /api/surgery-consultations/{id}/assign-doctor` - Phân công bác sĩ (ADMIN/DOCTOR)
+- `PUT /api/surgery-consultations/{id}/status` - Cập nhật status (ADMIN/DOCTOR)
+- `PUT /api/surgery-consultations/{id}/notes` - Cập nhật notes (ADMIN/DOCTOR)
+
+### 13. Ambulance Booking Module (`AmbulanceBookingController`, `AmbulanceBookingService`)
+
+**Chức năng:**
+- Đặt xe cứu thương (tất cả authenticated users)
+- Tự động tìm xe gần nhất
+- Tracking vị trí và trạng thái
+
+**Endpoints:**
+- `POST /api/ambulance-bookings` - Tạo booking (authenticated)
+- `GET /api/ambulance-bookings/{id}` - Lấy booking theo ID
+- `GET /api/ambulance-bookings/my-bookings` - Lấy bookings của tôi
+- `GET /api/ambulance-bookings` - Lấy tất cả bookings (ADMIN/DOCTOR, filter by status)
+- `GET /api/ambulance-bookings/ambulances/{ambulanceId}` - Lấy bookings theo ambulance (ADMIN/DOCTOR)
+- `PUT /api/ambulance-bookings/{id}/status` - Cập nhật status (ADMIN/DOCTOR)
+- `PUT /api/ambulance-bookings/{id}/assign-ambulance` - Phân công xe (ADMIN/DOCTOR)
+
+**Status Flow:**
+```
+PENDING → ASSIGNED → IN_TRANSIT → ARRIVED → COMPLETED
+                ↓
+            CANCELLED
+```
+
+### 14. Post/Blog Module (`PostController`, `PostService`)
+
+**Chức năng:**
+- Quản lý blog posts (ADMIN)
+- Public posts cho homepage
+- Draft posts
+
+**Endpoints:**
+- `POST /api/posts` - Tạo post (ADMIN)
+- `GET /api/posts/{id}` - Lấy post theo ID (public nếu published)
+- `GET /api/posts/published` - Lấy published posts (public)
+- `GET /api/posts` - Lấy tất cả posts (ADMIN, pagination, filter by status)
+- `GET /api/posts/my-posts` - Lấy posts của tôi
+- `PUT /api/posts/{id}` - Cập nhật post (author hoặc ADMIN)
+- `DELETE /api/posts/{id}` - Xóa post (author hoặc ADMIN)
+
+### 15. Review Module (`ReviewController`, `ReviewService`)
+
+**Chức năng:**
+- Tạo review cho bác sĩ (PATIENT)
+- Mỗi patient chỉ review một lần cho mỗi doctor
+- Public reviews
+
+**Endpoints:**
+- `POST /api/reviews` - Tạo review (PATIENT)
+- `GET /api/reviews/{id}` - Lấy review theo ID (public)
+- `GET /api/reviews/doctors/{doctorId}` - Lấy reviews theo doctor (public)
+- `GET /api/reviews/my-reviews` - Lấy reviews của tôi (PATIENT)
+- `DELETE /api/reviews/{id}` - Xóa review (author hoặc ADMIN)
+
+### 16. Ranking Module (`RankingController`, `RankingService`)
+
+**Chức năng:**
+- Xếp hạng bác sĩ theo rating, reviews, appointments
+- Xếp hạng phòng khám theo appointments, doctors, ratings
+
+**Endpoints:**
+- `GET /api/ranking/doctors` - Lấy ranking bác sĩ (ADMIN, limit: 1-100)
+- `GET /api/ranking/clinics` - Lấy ranking phòng khám (ADMIN, limit: 1-100)
+
+### 17. Dashboard Module (`DashboardController`, `DashboardService`)
+
+**Chức năng:**
+- Thống kê cho admin dashboard
+- Thống kê cho doctor dashboard
+
+**Endpoints:**
+- `GET /api/dashboard/admin` - Lấy stats admin (ADMIN)
+- `GET /api/dashboard/doctor` - Lấy stats doctor (DOCTOR)
+
+### 18. Public Module (`PublicController`, `PublicService`)
+
+**Chức năng:**
+- Public stats cho homepage
+- Featured doctors, clinics, recent posts
+
+**Endpoints:**
+- `GET /api/public/stats` - Lấy public stats (public, không cần auth)
+
 ---
 
 ## 🌐 API Endpoints
@@ -424,24 +611,190 @@ Authorization: Bearer <token>
 - `reason` (Text)
 - `status` (String: PENDING | APPROVED | REJECTED)
 
+#### BloodTest
+- `id` (Long, PK)
+- `patient_id` (FK → User)
+- `clinic_id` (FK → Clinic)
+- `testType` (String: CBC | BLOOD_GLUCOSE | LIPID_PANEL | LIVER_FUNCTION | THYROID_FUNCTION | VITAMIN_D)
+- `testDate` (LocalDate)
+- `testTime` (LocalTime)
+- `status` (String: PENDING | SCHEDULED | COMPLETED | CANCELLED)
+- `resultFileUrl` (String, nullable)
+- `notes` (Text, nullable)
+- `price` (Double)
+- `createdAt` (LocalDateTime)
+
+#### PharmacyOrder
+- `id` (Long, PK)
+- `patient_id` (FK → User)
+- `clinic_id` (FK → Clinic)
+- `appointment_id` (FK → Appointment, nullable)
+- `prescriptionFileUrl` (String, nullable)
+- `deliveryAddress` (Text)
+- `deliveryLat` (Double)
+- `deliveryLng` (Double)
+- `status` (String: PENDING | PROCESSING | READY | OUT_FOR_DELIVERY | DELIVERED | CANCELLED)
+- `totalPrice` (Double)
+- `createdAt` (LocalDateTime)
+- `deliveredAt` (LocalDateTime, nullable)
+
+#### PharmacyOrderItem
+- `id` (Long, PK)
+- `order_id` (FK → PharmacyOrder)
+- `medicationName` (String)
+- `quantity` (Integer)
+- `unitPrice` (Double)
+- `totalPrice` (Double)
+
+#### SurgeryConsultation
+- `id` (Long, PK)
+- `patient_id` (FK → User)
+- `doctor_id` (FK → Doctor, nullable)
+- `clinic_id` (FK → Clinic)
+- `surgeryType` (String)
+- `description` (Text)
+- `preferredDate` (LocalDate, nullable)
+- `status` (String: PENDING | CONSULTED | SCHEDULED | COMPLETED | CANCELLED)
+- `doctorNotes` (Text, nullable)
+- `createdAt` (LocalDateTime)
+
+#### AmbulanceBooking
+- `id` (Long, PK)
+- `patient_id` (FK → User, nullable)
+- `ambulance_id` (FK → Ambulance, nullable)
+- `clinic_id` (FK → Clinic)
+- `pickupLat` (Double)
+- `pickupLng` (Double)
+- `pickupAddress` (Text)
+- `destinationLat` (Double, nullable)
+- `destinationLng` (Double, nullable)
+- `destinationAddress` (Text, nullable)
+- `patientName` (String, nullable)
+- `patientPhone` (String, nullable)
+- `status` (String: PENDING | ASSIGNED | IN_TRANSIT | ARRIVED | COMPLETED | CANCELLED)
+- `estimatedTime` (Integer, nullable)
+- `distanceKm` (Double, nullable)
+- `notes` (Text, nullable)
+- `createdAt` (LocalDateTime)
+- `assignedAt` (LocalDateTime, nullable)
+- `arrivedAt` (LocalDateTime, nullable)
+
+#### Post
+- `id` (Long, PK)
+- `author_id` (FK → User)
+- `title` (String)
+- `content` (Text)
+- `imageUrl` (String, nullable)
+- `status` (String: DRAFT | PUBLISHED)
+- `createdAt` (LocalDateTime)
+- `updatedAt` (LocalDateTime)
+
+#### PostComment
+- `id` (Long, PK)
+- `post_id` (FK → Post)
+- `author_id` (FK → User)
+- `content` (Text)
+- `createdAt` (LocalDateTime)
+
+#### DoctorReview
+- `id` (Long, PK)
+- `patient_id` (FK → User)
+- `doctor_id` (FK → Doctor)
+- `rating` (Integer: 1-5)
+- `comment` (Text, nullable)
+- `createdAt` (LocalDateTime)
+
+#### UserProfile
+- `id` (Long, PK)
+- `user_id` (FK → User, unique)
+- `dateOfBirth` (LocalDate, nullable)
+- `gender` (String: MALE | FEMALE | OTHER, nullable)
+- `address` (Text, nullable)
+- `city` (String, nullable)
+- `country` (String, nullable)
+- `profileImageUrl` (String, nullable)
+
+#### PatientMedicalHistory
+- `id` (Long, PK)
+- `user_id` (FK → User, unique)
+- `bloodType` (String, nullable)
+- `allergies` (Text, nullable)
+- `chronicConditions` (Text, nullable)
+- `medications` (Text, nullable)
+- `previousSurgeries` (Text, nullable)
+- `familyHistory` (Text, nullable)
+- `updatedAt` (LocalDateTime)
+
+#### MedicalRecord
+- `id` (Long, PK)
+- `appointment_id` (FK → Appointment, nullable)
+- `patient_id` (FK → User)
+- `doctor_id` (FK → Doctor, nullable)
+- `diagnosis` (Text, nullable)
+- `prescription` (Text, nullable)
+- `notes` (Text, nullable)
+- `createdAt` (LocalDateTime)
+
+#### DoctorWorkingDays
+- `id` (Long, PK)
+- `doctor_id` (FK → Doctor)
+- `dayOfWeek` (String: MONDAY | TUESDAY | WEDNESDAY | THURSDAY | FRIDAY | SATURDAY | SUNDAY)
+- `isWorking` (Boolean)
+
+#### EmergencyAssignment
+- `id` (Long, PK)
+- `emergency_id` (FK → Emergency)
+- `doctor_id` (FK → Doctor, nullable)
+- `ambulance_id` (FK → Ambulance, nullable)
+- `assignedAt` (LocalDateTime)
+
 ### Relationships
 
 ```
 User (1) ──< (N) Doctor
 User (1) ──< (N) Appointment (patient)
 User (1) ──< (1) UserProfile
+User (1) ──< (1) PatientMedicalHistory
+User (1) ──< (N) BloodTest
+User (1) ──< (N) PharmacyOrder
+User (1) ──< (N) SurgeryConsultation
+User (1) ──< (N) AmbulanceBooking
+User (1) ──< (N) Post (author)
+User (1) ──< (N) PostComment (author)
+User (1) ──< (N) DoctorReview (patient)
+User (1) ──< (N) MedicalRecord (patient)
 
 Doctor (1) ──< (N) Appointment
 Doctor (1) ──< (N) DoctorSchedule
 Doctor (1) ──< (N) DoctorLeaveRequest
+Doctor (1) ──< (N) DoctorWorkingDays
+Doctor (1) ──< (N) SurgeryConsultation
+Doctor (1) ──< (N) EmergencyAssignment
+Doctor (1) ──< (N) DoctorReview
+Doctor (1) ──< (N) MedicalRecord
 Doctor (N) ──> (1) Clinic
 
 Clinic (1) ──< (N) Doctor
 Clinic (1) ──< (N) Appointment
 Clinic (1) ──< (N) Emergency
 Clinic (1) ──< (N) Ambulance
+Clinic (1) ──< (N) BloodTest
+Clinic (1) ──< (N) PharmacyOrder
+Clinic (1) ──< (N) SurgeryConsultation
+Clinic (1) ──< (N) AmbulanceBooking
 
 Appointment (1) ──> (1) DoctorSchedule
+Appointment (1) ──< (N) PharmacyOrder
+Appointment (1) ──< (N) MedicalRecord
+
+Emergency (1) ──< (N) EmergencyAssignment
+
+Ambulance (1) ──< (N) EmergencyAssignment
+Ambulance (1) ──< (N) AmbulanceBooking
+
+Post (1) ──< (N) PostComment
+
+PharmacyOrder (1) ──< (N) PharmacyOrderItem
 ```
 
 ---

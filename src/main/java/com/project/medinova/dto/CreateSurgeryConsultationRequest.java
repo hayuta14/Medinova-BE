@@ -18,3 +18,5 @@ public class CreateSurgeryConsultationRequest {
     private String urgency; // ROUTINE | URGENT | EMERGENCY
 }
 
+
+

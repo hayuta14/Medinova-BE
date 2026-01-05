@@ -17,3 +17,5 @@ public class ClinicRankingItem {
     private Integer rank;
 }
 
+
+

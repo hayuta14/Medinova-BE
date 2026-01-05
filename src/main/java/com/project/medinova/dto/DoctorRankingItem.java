@@ -19,3 +19,5 @@ public class DoctorRankingItem {
     private Integer rank;
 }
 
+
+

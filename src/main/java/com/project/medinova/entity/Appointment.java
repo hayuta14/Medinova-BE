@@ -37,7 +37,10 @@ public class Appointment {
     private LocalDateTime appointmentTime;
 
     @Column(nullable = false)
-    private String status; // PENDING | CONFIRMED | COMPLETED | CANCELLED
+    private String status; // PENDING | CONFIRMED | CHECKED_IN | IN_PROGRESS | REVIEW | COMPLETED | CANCELLED | NO_SHOW | REJECTED | EXPIRED | CANCELLED_BY_DOCTOR | CANCELLED_BY_PATIENT
+
+    @Column(name = "rejection_reason", columnDefinition = "TEXT")
+    private String rejectionReason; // Lý do từ chối (chỉ doctor/admin thấy)
 
     @Column(name = "age")
     private Integer age;

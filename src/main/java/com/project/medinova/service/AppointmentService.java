@@ -6,7 +6,9 @@ import com.project.medinova.dto.ConfirmAppointmentRequest;
 import com.project.medinova.dto.CreateAppointmentRequest;
 import com.project.medinova.dto.HoldSlotRequest;
 import com.project.medinova.dto.UpdateAppointmentStatusRequest;
+import com.project.medinova.dto.UpdateAppointmentStatusByDoctorRequest;
 import com.project.medinova.dto.UpdateAppointmentNotesRequest;
+import com.project.medinova.dto.RejectAppointmentRequest;
 import com.project.medinova.entity.Appointment;
 import com.project.medinova.entity.Doctor;
 import com.project.medinova.entity.DoctorLeaveRequest;
@@ -77,7 +79,10 @@ public class AppointmentService {
             if (appointment.getDoctor().getUser() != null) {
                 response.setDoctorName(appointment.getDoctor().getUser().getFullName());
             }
-            response.setDoctorSpecialization(appointment.getDoctor().getSpecialization());
+            if (appointment.getDoctor().getDepartment() != null) {
+                response.setDoctorDepartment(appointment.getDoctor().getDepartment().name());
+                response.setDoctorDepartmentDisplayName(appointment.getDoctor().getDepartment().getDisplayName());
+            }
         }
         
         // Clinic info
@@ -103,6 +108,7 @@ public class AppointmentService {
         response.setGender(appointment.getGender());
         response.setSymptoms(appointment.getSymptoms());
         response.setNotes(appointment.getNotes());
+        response.setRejectionReason(appointment.getRejectionReason());
         response.setCreatedAt(appointment.getCreatedAt());
         
         return response;
@@ -455,7 +461,7 @@ public class AppointmentService {
      * Update appointment status by doctor
      * Doctors can mark appointments as COMPLETED or update other statuses
      */
-    public AppointmentResponse updateAppointmentStatusByDoctor(Long id, UpdateAppointmentStatusRequest request) {
+    public AppointmentResponse updateAppointmentStatusByDoctor(Long id, UpdateAppointmentStatusByDoctorRequest request) {
         // Lấy user hiện tại từ JWT
         User currentUser = authService.getCurrentUser();
         if (currentUser == null) {
@@ -482,7 +488,7 @@ public class AppointmentService {
 
         // Validate status
         String newStatus = request.getStatus();
-        String[] allowedStatuses = {"PENDING", "CONFIRMED", "COMPLETED", "CANCELLED"};
+        String[] allowedStatuses = {"PENDING", "CONFIRMED", "CHECKED_IN", "IN_PROGRESS", "REVIEW", "COMPLETED", "CANCELLED", "NO_SHOW", "REJECTED", "EXPIRED", "CANCELLED_BY_DOCTOR", "CANCELLED_BY_PATIENT"};
         boolean isValidStatus = false;
         for (String status : allowedStatuses) {
             if (status.equals(newStatus)) {
@@ -495,26 +501,68 @@ public class AppointmentService {
             throw new BadRequestException("Invalid status: " + newStatus);
         }
 
-        // Kiểm tra không thể update nếu đã completed hoặc cancelled (trừ khi đang set lại)
+        // Kiểm tra không thể update nếu đã completed, expired, rejected (trừ khi đang set lại)
         String currentStatus = appointment.getStatus();
         if ("COMPLETED".equals(currentStatus) && !"COMPLETED".equals(newStatus)) {
             throw new BadRequestException("Cannot change status of a completed appointment");
         }
 
-        if ("CANCELLED".equals(currentStatus) && !"CANCELLED".equals(newStatus)) {
-            throw new BadRequestException("Cannot change status of a cancelled appointment");
+        if ("EXPIRED".equals(currentStatus) || "REJECTED".equals(currentStatus)) {
+            throw new BadRequestException("Cannot change status of an expired or rejected appointment");
+        }
+
+        // Validate status transitions theo state machine chuẩn bệnh viện
+        // PENDING → CONFIRMED → CHECKED_IN → IN_PROGRESS → REVIEW → COMPLETED
+        // PENDING → REJECTED (doctor reject)
+        // PENDING → EXPIRED (timeout)
+        // CONFIRMED → CANCELLED_BY_DOCTOR (doctor cancel after confirm)
+        // Có thể CANCELLED hoặc NO_SHOW ở bất kỳ giai đoạn nào (trừ COMPLETED, EXPIRED, REJECTED)
+        if ("PENDING".equals(currentStatus)) {
+            if (!"CONFIRMED".equals(newStatus) && !"REJECTED".equals(newStatus) && !"CANCELLED".equals(newStatus) && !"NO_SHOW".equals(newStatus)) {
+                throw new BadRequestException("Can only change PENDING appointment to CONFIRMED, REJECTED, CANCELLED, or NO_SHOW");
+            }
+        } else if ("CONFIRMED".equals(currentStatus)) {
+            if (!"CHECKED_IN".equals(newStatus) && !"CANCELLED_BY_DOCTOR".equals(newStatus) && !"CANCELLED".equals(newStatus) && !"NO_SHOW".equals(newStatus)) {
+                throw new BadRequestException("Can only change CONFIRMED appointment to CHECKED_IN, CANCELLED_BY_DOCTOR, CANCELLED, or NO_SHOW");
+            }
+        } else if ("CHECKED_IN".equals(currentStatus)) {
+            if (!"IN_PROGRESS".equals(newStatus) && !"CANCELLED".equals(newStatus) && !"NO_SHOW".equals(newStatus)) {
+                throw new BadRequestException("Can only change CHECKED_IN appointment to IN_PROGRESS, CANCELLED, or NO_SHOW");
+            }
+        } else if ("IN_PROGRESS".equals(currentStatus)) {
+            if (!"REVIEW".equals(newStatus) && !"CANCELLED".equals(newStatus)) {
+                throw new BadRequestException("Can only change IN_PROGRESS appointment to REVIEW or CANCELLED");
+            }
+        } else if ("REVIEW".equals(currentStatus)) {
+            if (!"COMPLETED".equals(newStatus)) {
+                throw new BadRequestException("Can only change REVIEW appointment to COMPLETED");
+            }
         }
 
         // Cập nhật status
         appointment.setStatus(newStatus);
 
-        // Nếu complete, có thể cập nhật schedule status
-        if ("COMPLETED".equals(newStatus)) {
-            DoctorSchedule schedule = appointment.getSchedule();
-            if (schedule != null) {
+        // Cập nhật schedule status tương ứng
+        DoctorSchedule schedule = appointment.getSchedule();
+        if (schedule != null) {
+            if ("COMPLETED".equals(newStatus)) {
                 schedule.setStatus("COMPLETED");
-                scheduleRepository.save(schedule);
+            } else if ("REVIEW".equals(newStatus)) {
+                schedule.setStatus("REVIEW");
+            } else if ("CANCELLED".equals(newStatus) || "NO_SHOW".equals(newStatus) || "CANCELLED_BY_DOCTOR".equals(newStatus)) {
+                // Khi cancel hoặc no-show, có thể giải phóng slot nếu chưa quá thời gian
+                schedule.setStatus("BLOCKED");
+            } else if ("REJECTED".equals(newStatus) || "EXPIRED".equals(newStatus)) {
+                // Release slot khi reject hoặc expire
+                schedule.setStatus("BLOCKED");
+            } else if ("IN_PROGRESS".equals(newStatus)) {
+                schedule.setStatus("BOOKED"); // Giữ BOOKED khi đang khám
+            } else if ("CHECKED_IN".equals(newStatus)) {
+                schedule.setStatus("BOOKED"); // Giữ BOOKED khi đã check-in
+            } else if ("CONFIRMED".equals(newStatus)) {
+                schedule.setStatus("BOOKED"); // Đảm bảo BOOKED khi confirmed
             }
+            scheduleRepository.save(schedule);
         }
 
         Appointment savedAppointment = appointmentRepository.save(appointment);
@@ -730,6 +778,295 @@ public class AppointmentService {
 
         // Cập nhật notes
         appointment.setNotes(request.getNotes());
+
+        Appointment savedAppointment = appointmentRepository.save(appointment);
+        return toAppointmentResponse(savedAppointment);
+    }
+
+    /**
+     * Check-in appointment - changes status from CONFIRMED to CHECKED_IN
+     * Can be called by staff or doctor
+     */
+    public AppointmentResponse checkInAppointment(Long id) {
+        // Lấy user hiện tại từ JWT
+        User currentUser = authService.getCurrentUser();
+        if (currentUser == null) {
+            throw new ForbiddenException("User not authenticated");
+        }
+
+        // Tìm appointment
+        Appointment appointment = appointmentRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Appointment not found with id: " + id));
+
+        // Kiểm tra status phải là CONFIRMED
+        if (!"CONFIRMED".equals(appointment.getStatus())) {
+            throw new BadRequestException("Can only check-in appointments with CONFIRMED status. Current status: " + appointment.getStatus());
+        }
+
+        // Cập nhật status
+        appointment.setStatus("CHECKED_IN");
+
+        // Cập nhật schedule status
+        DoctorSchedule schedule = appointment.getSchedule();
+        if (schedule != null) {
+            schedule.setStatus("BOOKED");
+            scheduleRepository.save(schedule);
+        }
+
+        Appointment savedAppointment = appointmentRepository.save(appointment);
+        return toAppointmentResponse(savedAppointment);
+    }
+
+    /**
+     * Start consultation - changes status from CHECKED_IN to IN_PROGRESS
+     * Only doctors assigned to the appointment can start consultation
+     */
+    public AppointmentResponse startConsultation(Long id) {
+        // Lấy user hiện tại từ JWT
+        User currentUser = authService.getCurrentUser();
+        if (currentUser == null) {
+            throw new ForbiddenException("User not authenticated");
+        }
+
+        // Kiểm tra user có role DOCTOR
+        if (!"DOCTOR".equals(currentUser.getRole())) {
+            throw new ForbiddenException("Only doctors can start consultation");
+        }
+
+        // Tìm doctor profile
+        Doctor doctor = doctorRepository.findByUserId(currentUser.getId())
+                .orElseThrow(() -> new NotFoundException("Doctor profile not found"));
+
+        // Tìm appointment
+        Appointment appointment = appointmentRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Appointment not found with id: " + id));
+
+        // Kiểm tra appointment được assign cho doctor hiện tại
+        if (!appointment.getDoctor().getId().equals(doctor.getId())) {
+            throw new ForbiddenException("You can only start consultation for appointments assigned to you");
+        }
+
+        // Kiểm tra status phải là CHECKED_IN
+        if (!"CHECKED_IN".equals(appointment.getStatus())) {
+            throw new BadRequestException("Can only start consultation for appointments with CHECKED_IN status. Current status: " + appointment.getStatus());
+        }
+
+        // Cập nhật status
+        appointment.setStatus("IN_PROGRESS");
+
+        // Cập nhật schedule status
+        DoctorSchedule schedule = appointment.getSchedule();
+        if (schedule != null) {
+            schedule.setStatus("BOOKED");
+            scheduleRepository.save(schedule);
+        }
+
+        Appointment savedAppointment = appointmentRepository.save(appointment);
+        return toAppointmentResponse(savedAppointment);
+    }
+
+    /**
+     * Complete consultation - changes status from IN_PROGRESS to REVIEW
+     * Only doctors assigned to the appointment can complete consultation
+     * After completion, patient can review the doctor
+     */
+    public AppointmentResponse completeConsultation(Long id) {
+        // Lấy user hiện tại từ JWT
+        User currentUser = authService.getCurrentUser();
+        if (currentUser == null) {
+            throw new ForbiddenException("User not authenticated");
+        }
+
+        // Kiểm tra user có role DOCTOR
+        if (!"DOCTOR".equals(currentUser.getRole())) {
+            throw new ForbiddenException("Only doctors can complete consultation");
+        }
+
+        // Tìm doctor profile
+        Doctor doctor = doctorRepository.findByUserId(currentUser.getId())
+                .orElseThrow(() -> new NotFoundException("Doctor profile not found"));
+
+        // Tìm appointment
+        Appointment appointment = appointmentRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Appointment not found with id: " + id));
+
+        // Kiểm tra appointment được assign cho doctor hiện tại
+        if (!appointment.getDoctor().getId().equals(doctor.getId())) {
+            throw new ForbiddenException("You can only complete consultation for appointments assigned to you");
+        }
+
+        // Kiểm tra status phải là IN_PROGRESS
+        if (!"IN_PROGRESS".equals(appointment.getStatus())) {
+            throw new BadRequestException("Can only complete consultation for appointments with IN_PROGRESS status. Current status: " + appointment.getStatus());
+        }
+
+        // Cập nhật status - chuyển sang REVIEW để patient có thể đánh giá
+        appointment.setStatus("REVIEW");
+
+        // Cập nhật schedule status
+        DoctorSchedule schedule = appointment.getSchedule();
+        if (schedule != null) {
+            schedule.setStatus("REVIEW");
+            scheduleRepository.save(schedule);
+        }
+
+        Appointment savedAppointment = appointmentRepository.save(appointment);
+        return toAppointmentResponse(savedAppointment);
+    }
+
+    /**
+     * Doctor confirms a PENDING appointment
+     * Changes status from PENDING to CONFIRMED
+     * Locks the slot (BOOKED)
+     */
+    public AppointmentResponse confirmByDoctor(Long id) {
+        // Lấy user hiện tại từ JWT
+        User currentUser = authService.getCurrentUser();
+        if (currentUser == null) {
+            throw new ForbiddenException("User not authenticated");
+        }
+
+        // Kiểm tra user có role DOCTOR
+        if (!"DOCTOR".equals(currentUser.getRole())) {
+            throw new ForbiddenException("Only doctors can confirm appointments");
+        }
+
+        // Tìm doctor profile
+        Doctor doctor = doctorRepository.findByUserId(currentUser.getId())
+                .orElseThrow(() -> new NotFoundException("Doctor profile not found"));
+
+        // Tìm appointment
+        Appointment appointment = appointmentRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Appointment not found with id: " + id));
+
+        // Kiểm tra appointment được assign cho doctor hiện tại
+        if (!appointment.getDoctor().getId().equals(doctor.getId())) {
+            throw new ForbiddenException("You can only confirm appointments assigned to you");
+        }
+
+        // Kiểm tra status phải là PENDING
+        if (!"PENDING".equals(appointment.getStatus())) {
+            throw new BadRequestException("Can only confirm appointments with PENDING status. Current status: " + appointment.getStatus());
+        }
+
+        // Cập nhật status
+        appointment.setStatus("CONFIRMED");
+
+        // Lock slot (chuyển schedule sang BOOKED)
+        DoctorSchedule schedule = appointment.getSchedule();
+        if (schedule != null) {
+            schedule.setStatus("BOOKED");
+            schedule.setHoldExpiresAt(null); // Xóa hold expiry nếu có
+            scheduleRepository.save(schedule);
+        }
+
+        Appointment savedAppointment = appointmentRepository.save(appointment);
+        return toAppointmentResponse(savedAppointment);
+    }
+
+    /**
+     * Doctor rejects a PENDING appointment
+     * Changes status from PENDING to REJECTED
+     * Releases the slot
+     * Reason is stored internally (only visible to doctor/admin)
+     */
+    public AppointmentResponse rejectByDoctor(Long id, RejectAppointmentRequest request) {
+        // Lấy user hiện tại từ JWT
+        User currentUser = authService.getCurrentUser();
+        if (currentUser == null) {
+            throw new ForbiddenException("User not authenticated");
+        }
+
+        // Kiểm tra user có role DOCTOR
+        if (!"DOCTOR".equals(currentUser.getRole())) {
+            throw new ForbiddenException("Only doctors can reject appointments");
+        }
+
+        // Tìm doctor profile
+        Doctor doctor = doctorRepository.findByUserId(currentUser.getId())
+                .orElseThrow(() -> new NotFoundException("Doctor profile not found"));
+
+        // Tìm appointment
+        Appointment appointment = appointmentRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Appointment not found with id: " + id));
+
+        // Kiểm tra appointment được assign cho doctor hiện tại
+        if (!appointment.getDoctor().getId().equals(doctor.getId())) {
+            throw new ForbiddenException("You can only reject appointments assigned to you");
+        }
+
+        // Kiểm tra status phải là PENDING
+        if (!"PENDING".equals(appointment.getStatus())) {
+            throw new BadRequestException("Can only reject appointments with PENDING status. Current status: " + appointment.getStatus());
+        }
+
+        // Lưu lý do từ chối (internal, chỉ doctor/admin thấy)
+        if (request != null && request.getReason() != null && !request.getReason().trim().isEmpty()) {
+            appointment.setRejectionReason(request.getReason());
+        }
+
+        // Cập nhật status
+        appointment.setStatus("REJECTED");
+
+        // Release slot (xóa schedule để giải phóng slot)
+        DoctorSchedule schedule = appointment.getSchedule();
+        if (schedule != null) {
+            scheduleRepository.delete(schedule);
+        }
+
+        Appointment savedAppointment = appointmentRepository.save(appointment);
+        return toAppointmentResponse(savedAppointment);
+    }
+
+    /**
+     * Doctor cancels a CONFIRMED appointment
+     * Changes status from CONFIRMED to CANCELLED_BY_DOCTOR
+     * Releases the slot
+     */
+    public AppointmentResponse cancelByDoctor(Long id, RejectAppointmentRequest request) {
+        // Lấy user hiện tại từ JWT
+        User currentUser = authService.getCurrentUser();
+        if (currentUser == null) {
+            throw new ForbiddenException("User not authenticated");
+        }
+
+        // Kiểm tra user có role DOCTOR
+        if (!"DOCTOR".equals(currentUser.getRole())) {
+            throw new ForbiddenException("Only doctors can cancel appointments");
+        }
+
+        // Tìm doctor profile
+        Doctor doctor = doctorRepository.findByUserId(currentUser.getId())
+                .orElseThrow(() -> new NotFoundException("Doctor profile not found"));
+
+        // Tìm appointment
+        Appointment appointment = appointmentRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Appointment not found with id: " + id));
+
+        // Kiểm tra appointment được assign cho doctor hiện tại
+        if (!appointment.getDoctor().getId().equals(doctor.getId())) {
+            throw new ForbiddenException("You can only cancel appointments assigned to you");
+        }
+
+        // Kiểm tra status phải là CONFIRMED
+        if (!"CONFIRMED".equals(appointment.getStatus())) {
+            throw new BadRequestException("Can only cancel appointments with CONFIRMED status. Current status: " + appointment.getStatus());
+        }
+
+        // Lưu lý do hủy (internal, chỉ doctor/admin thấy)
+        if (request != null && request.getReason() != null && !request.getReason().trim().isEmpty()) {
+            appointment.setRejectionReason(request.getReason());
+        }
+
+        // Cập nhật status
+        appointment.setStatus("CANCELLED_BY_DOCTOR");
+
+        // Release slot
+        DoctorSchedule schedule = appointment.getSchedule();
+        if (schedule != null) {
+            schedule.setStatus("BLOCKED");
+            scheduleRepository.save(schedule);
+        }
 
         Appointment savedAppointment = appointmentRepository.save(appointment);
         return toAppointmentResponse(savedAppointment);

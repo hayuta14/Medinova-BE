@@ -5,7 +5,9 @@ import com.project.medinova.dto.BusyScheduleResponse;
 import com.project.medinova.dto.ConfirmAppointmentRequest;
 import com.project.medinova.dto.CreateAppointmentRequest;
 import com.project.medinova.dto.UpdateAppointmentStatusRequest;
+import com.project.medinova.dto.UpdateAppointmentStatusByDoctorRequest;
 import com.project.medinova.dto.UpdateAppointmentNotesRequest;
+import com.project.medinova.dto.RejectAppointmentRequest;
 import com.project.medinova.service.AppointmentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -191,7 +193,7 @@ public class AppointmentController {
 
     @Operation(
             summary = "Update appointment status (Doctor)",
-            description = "Update the status of an appointment assigned to the current doctor. Doctors can mark appointments as COMPLETED or update other statuses. Only appointments assigned to the current doctor can be updated."
+            description = "Update the status of an appointment assigned to the current doctor. Doctors can change status to CONFIRMED, REVIEW, COMPLETED, or CANCELLED. When marking as completed, status will automatically change to REVIEW to allow patient review. Only appointments assigned to the current doctor can be updated."
     )
     @ApiResponses(value = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Appointment status updated successfully"),
@@ -204,7 +206,7 @@ public class AppointmentController {
     @PutMapping("/{id}/status/doctor")
     public ResponseEntity<AppointmentResponse> updateAppointmentStatusByDoctor(
             @PathVariable Long id,
-            @Valid @RequestBody UpdateAppointmentStatusRequest request) {
+            @Valid @RequestBody UpdateAppointmentStatusByDoctorRequest request) {
         AppointmentResponse appointment = appointmentService.updateAppointmentStatusByDoctor(id, request);
         return ResponseEntity.ok(appointment);
     }
@@ -246,6 +248,118 @@ public class AppointmentController {
             @PathVariable Long id,
             @Valid @RequestBody UpdateAppointmentNotesRequest request) {
         AppointmentResponse appointment = appointmentService.updateAppointmentNotes(id, request);
+        return ResponseEntity.ok(appointment);
+    }
+
+    @Operation(
+            summary = "Check-in appointment",
+            description = "Mark an appointment as checked-in. This changes the status from CONFIRMED to CHECKED_IN. Can be called by staff or doctor. The appointment must be in CONFIRMED status."
+    )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Appointment checked-in successfully"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Bad request - Appointment not in CONFIRMED status"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Appointment not found")
+    })
+    @PreAuthorize("hasAnyRole('DOCTOR', 'ADMIN')")
+    @PutMapping("/{id}/check-in")
+    public ResponseEntity<AppointmentResponse> checkInAppointment(@PathVariable Long id) {
+        AppointmentResponse appointment = appointmentService.checkInAppointment(id);
+        return ResponseEntity.ok(appointment);
+    }
+
+    @Operation(
+            summary = "Start consultation",
+            description = "Start a consultation session. This changes the status from CHECKED_IN to IN_PROGRESS. Only doctors assigned to the appointment can start consultation. The appointment must be in CHECKED_IN status."
+    )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Consultation started successfully"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Bad request - Appointment not in CHECKED_IN status"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden - Can only start consultation for appointments assigned to you"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Appointment not found")
+    })
+    @PreAuthorize("hasRole('DOCTOR')")
+    @PutMapping("/{id}/start")
+    public ResponseEntity<AppointmentResponse> startConsultation(@PathVariable Long id) {
+        AppointmentResponse appointment = appointmentService.startConsultation(id);
+        return ResponseEntity.ok(appointment);
+    }
+
+    @Operation(
+            summary = "Complete consultation",
+            description = "Complete a consultation session. This changes the status from IN_PROGRESS to REVIEW, allowing the patient to review the doctor. Only doctors assigned to the appointment can complete consultation. The appointment must be in IN_PROGRESS status."
+    )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Consultation completed successfully, status changed to REVIEW"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Bad request - Appointment not in IN_PROGRESS status"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden - Can only complete consultation for appointments assigned to you"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Appointment not found")
+    })
+    @PreAuthorize("hasRole('DOCTOR')")
+    @PutMapping("/{id}/complete")
+    public ResponseEntity<AppointmentResponse> completeConsultation(@PathVariable Long id) {
+        AppointmentResponse appointment = appointmentService.completeConsultation(id);
+        return ResponseEntity.ok(appointment);
+    }
+
+    @Operation(
+            summary = "Doctor confirm appointment",
+            description = "Doctor confirms a PENDING appointment. This changes the status from PENDING to CONFIRMED and locks the slot (BOOKED). Only doctors assigned to the appointment can confirm. The appointment must be in PENDING status."
+    )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Appointment confirmed successfully"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Bad request - Appointment not in PENDING status"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden - Can only confirm appointments assigned to you"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Appointment not found")
+    })
+    @PreAuthorize("hasRole('DOCTOR')")
+    @PostMapping("/{id}/confirm")
+    public ResponseEntity<AppointmentResponse> confirmByDoctor(@PathVariable Long id) {
+        AppointmentResponse appointment = appointmentService.confirmByDoctor(id);
+        return ResponseEntity.ok(appointment);
+    }
+
+    @Operation(
+            summary = "Doctor reject appointment",
+            description = "Doctor rejects a PENDING appointment. This changes the status from PENDING to REJECTED and releases the slot. The rejection reason is stored internally (only visible to doctor and admin). Patient will see a generic message. Only doctors assigned to the appointment can reject. The appointment must be in PENDING status."
+    )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Appointment rejected successfully"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Bad request - Appointment not in PENDING status"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden - Can only reject appointments assigned to you"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Appointment not found")
+    })
+    @PreAuthorize("hasRole('DOCTOR')")
+    @PostMapping("/{id}/reject")
+    public ResponseEntity<AppointmentResponse> rejectByDoctor(
+            @PathVariable Long id,
+            @RequestBody(required = false) RejectAppointmentRequest request) {
+        AppointmentResponse appointment = appointmentService.rejectByDoctor(id, request);
+        return ResponseEntity.ok(appointment);
+    }
+
+    @Operation(
+            summary = "Doctor cancel confirmed appointment",
+            description = "Doctor cancels a CONFIRMED appointment. This changes the status from CONFIRMED to CANCELLED_BY_DOCTOR and releases the slot. The cancellation reason is stored internally (only visible to doctor and admin). Only doctors assigned to the appointment can cancel. The appointment must be in CONFIRMED status."
+    )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Appointment cancelled successfully"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Bad request - Appointment not in CONFIRMED status"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden - Can only cancel appointments assigned to you"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Appointment not found")
+    })
+    @PreAuthorize("hasRole('DOCTOR')")
+    @PostMapping("/{id}/cancel")
+    public ResponseEntity<AppointmentResponse> cancelByDoctor(
+            @PathVariable Long id,
+            @RequestBody(required = false) RejectAppointmentRequest request) {
+        AppointmentResponse appointment = appointmentService.cancelByDoctor(id, request);
         return ResponseEntity.ok(appointment);
     }
 }

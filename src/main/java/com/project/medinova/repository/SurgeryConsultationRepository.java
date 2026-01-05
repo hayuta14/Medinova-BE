@@ -16,3 +16,5 @@ public interface SurgeryConsultationRepository extends JpaRepository<SurgeryCons
     List<SurgeryConsultation> findByDoctorIdAndStatus(Long doctorId, String status);
 }
 
+
+

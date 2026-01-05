@@ -64,26 +64,39 @@ public class AppointmentSchedulerService {
     }
 
     /**
-     * Tự động release PENDING appointments sau 3 tiếng (cho bác sĩ)
+     * Tự động expire PENDING appointments sau timeout (mặc định 2 giờ cho bệnh viện)
      * Chạy mỗi 10 phút
+     * Chuyển status sang EXPIRED và release slot thay vì xóa
      */
     @Scheduled(fixedRate = 600000) // 10 minutes
     @Transactional
-    public void releaseExpiredPendingAppointments() {
-        LocalDateTime threeHoursAgo = LocalDateTime.now().minusHours(3);
-        List<Appointment> expiredPending = appointmentRepository.findByStatusAndCreatedAtBefore("PENDING", threeHoursAgo);
+    public void expirePendingAppointments() {
+        // Timeout: 2 giờ cho bệnh viện (có thể config trong application.properties)
+        LocalDateTime timeoutAgo = LocalDateTime.now().minusHours(2);
+        List<Appointment> expiredPending = appointmentRepository.findByStatusAndCreatedAtBefore("PENDING", timeoutAgo);
         
         for (Appointment appointment : expiredPending) {
-            logger.info("Releasing expired PENDING appointment: appointmentId={}, createdAt={}", 
+            logger.info("Expiring PENDING appointment: appointmentId={}, createdAt={}", 
                     appointment.getId(), appointment.getCreatedAt());
             
-            // Xóa appointment - cascade = CascadeType.ALL sẽ tự động xóa schedule
-            appointmentRepository.delete(appointment);
-            logger.info("Deleted expired PENDING appointment: appointmentId={}", appointment.getId());
+            // Chuyển status sang EXPIRED
+            appointment.setStatus("EXPIRED");
+            appointmentRepository.save(appointment);
+            
+            // Release slot (chuyển schedule về AVAILABLE hoặc xóa nếu cần)
+            DoctorSchedule schedule = appointment.getSchedule();
+            if (schedule != null) {
+                // Xóa schedule để giải phóng slot
+                scheduleRepository.delete(schedule);
+                logger.info("Released slot for expired appointment: appointmentId={}, scheduleId={}", 
+                        appointment.getId(), schedule.getId());
+            }
+            
+            logger.info("Expired PENDING appointment: appointmentId={}, newStatus=EXPIRED", appointment.getId());
         }
         
         if (!expiredPending.isEmpty()) {
-            logger.info("Released {} expired PENDING appointments", expiredPending.size());
+            logger.info("Expired {} PENDING appointments", expiredPending.size());
         }
     }
 }

@@ -14,3 +14,5 @@ public class DoctorRankingResponse {
     private Long totalDoctors;
 }
 
+
+

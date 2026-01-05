@@ -14,3 +14,5 @@ public class ClinicRankingResponse {
     private Long totalClinics;
 }
 
+
+

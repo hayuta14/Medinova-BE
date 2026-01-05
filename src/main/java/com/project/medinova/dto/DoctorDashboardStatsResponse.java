@@ -22,3 +22,5 @@ public class DoctorDashboardStatsResponse {
     private Map<String, Long> emergenciesByStatus;
 }
 
+
+

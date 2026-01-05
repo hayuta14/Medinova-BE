@@ -13,3 +13,5 @@ public class UpdatePostRequest {
     private String status; // DRAFT | PUBLISHED
 }
 
+
+

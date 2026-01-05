@@ -1,5 +1,6 @@
 package com.project.medinova.dto;
 
+import com.project.medinova.entity.Department;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -10,10 +11,12 @@ import lombok.NoArgsConstructor;
 public class DoctorSummary {
     private Long id;
     private String name;
-    private String specialization;
+    private Department department;
+    private String departmentDisplayName;
     private Integer experienceYears;
     private Double averageRating;
     private Long totalReviews;
     private String clinicName;
 }
+
 

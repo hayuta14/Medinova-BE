@@ -11,5 +11,7 @@ public interface DoctorReviewRepository extends JpaRepository<DoctorReview, Long
     List<DoctorReview> findByDoctorId(Long doctorId);
     List<DoctorReview> findByPatientId(Long patientId);
     List<DoctorReview> findByDoctorIdAndPatientId(Long doctorId, Long patientId);
+    List<DoctorReview> findByAppointmentId(Long appointmentId);
+    DoctorReview findByAppointmentIdAndPatientId(Long appointmentId, Long patientId);
 }
 

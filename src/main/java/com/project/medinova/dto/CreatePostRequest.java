@@ -16,3 +16,5 @@ public class CreatePostRequest {
     private String status; // DRAFT | PUBLISHED
 }
 
+
+

@@ -25,7 +25,9 @@ public class Doctor {
     @JoinColumn(name = "clinic_id", nullable = false)
     private Clinic clinic;
 
-    private String specialization;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Department department;
 
     @Column(name = "experience_years")
     private Integer experienceYears;

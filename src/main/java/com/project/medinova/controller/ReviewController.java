@@ -28,7 +28,7 @@ public class ReviewController {
 
     @Operation(
             summary = "Create review",
-            description = "Create a review for a doctor. Only patients can create reviews. Each patient can only review a doctor once."
+            description = "Create a review for a doctor. Only patients can create reviews. If appointmentId is provided, the appointment must be in REVIEW or COMPLETED status and belong to the patient. Each appointment can only be reviewed once."
     )
     @ApiResponses(value = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(

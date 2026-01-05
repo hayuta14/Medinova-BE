@@ -3,6 +3,7 @@ package com.project.medinova.service;
 import com.project.medinova.dto.CreateDoctorRequest;
 import com.project.medinova.dto.UpdateDoctorRequest;
 import com.project.medinova.entity.Clinic;
+import com.project.medinova.entity.Department;
 import com.project.medinova.entity.Doctor;
 import com.project.medinova.entity.User;
 import com.project.medinova.exception.BadRequestException;
@@ -57,7 +58,7 @@ public class DoctorService {
         Doctor doctor = new Doctor();
         doctor.setUser(user);
         doctor.setClinic(clinic);
-        doctor.setSpecialization(request.getSpecialization());
+        doctor.setDepartment(request.getDepartment());
         doctor.setExperienceYears(request.getExperienceYears());
         doctor.setBio(request.getBio());
         doctor.setDefaultStartTime(request.getDefaultStartTime());
@@ -84,8 +85,12 @@ public class DoctorService {
         return doctorRepository.findByClinicId(clinicId);
     }
 
-    public List<Doctor> getDoctorsBySpecialization(String specialization) {
-        return doctorRepository.findBySpecialization(specialization);
+    public List<Doctor> getDoctorsByDepartment(Department department) {
+        return doctorRepository.findByDepartment(department);
+    }
+
+    public List<Doctor> getDoctorsByClinicAndDepartment(Long clinicId, Department department) {
+        return doctorRepository.findByClinicIdAndDepartment(clinicId, department);
     }
 
     public Page<Doctor> searchDoctors(String searchTerm, Long clinicId, Pageable pageable) {
@@ -157,8 +162,8 @@ public class DoctorService {
             doctor.setClinic(clinic);
         }
 
-        if (request.getSpecialization() != null) {
-            doctor.setSpecialization(request.getSpecialization());
+        if (request.getDepartment() != null) {
+            doctor.setDepartment(request.getDepartment());
         }
         if (request.getExperienceYears() != null) {
             doctor.setExperienceYears(request.getExperienceYears());

@@ -61,7 +61,10 @@ public class PublicService {
                     DoctorSummary summary = new DoctorSummary();
                     summary.setId(doctor.getId());
                     summary.setName(doctor.getUser().getFullName());
-                    summary.setSpecialization(doctor.getSpecialization());
+                    if (doctor.getDepartment() != null) {
+                        summary.setDepartment(doctor.getDepartment());
+                        summary.setDepartmentDisplayName(doctor.getDepartment().getDisplayName());
+                    }
                     summary.setExperienceYears(doctor.getExperienceYears());
                     summary.setClinicName(doctor.getClinic().getName());
 
@@ -151,4 +154,5 @@ public class PublicService {
                 .collect(Collectors.toList());
     }
 }
+
 

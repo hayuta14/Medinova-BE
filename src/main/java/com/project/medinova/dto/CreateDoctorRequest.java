@@ -1,10 +1,9 @@
 package com.project.medinova.dto;
 
+import com.project.medinova.entity.Department;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
-import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -26,10 +25,13 @@ public class CreateDoctorRequest {
     @Schema(description = "ID of the clinic where the doctor will work", example = "1")
     private Long clinicId;
 
-    @NotBlank(message = "Specialization is required")
-    @Size(max = 255, message = "Specialization must not exceed 255 characters")
-    @Schema(description = "Doctor's medical specialization", example = "Cardiology")
-    private String specialization;
+    @NotNull(message = "Department is required")
+    @Schema(description = "Doctor's medical department/specialty", example = "CARDIOLOGY", 
+            allowableValues = {"GENERAL_MEDICINE", "PEDIATRICS", "OBSTETRICS_GYNECOLOGY", "SURGERY", 
+                              "CARDIOLOGY", "NEUROLOGY", "ORTHOPEDICS", "ONCOLOGY", "GASTROENTEROLOGY", 
+                              "RESPIRATORY", "NEPHROLOGY", "ENDOCRINOLOGY", "HEMATOLOGY", "RHEUMATOLOGY", 
+                              "DERMATOLOGY", "INFECTIOUS_DISEASE"})
+    private Department department;
 
     @Positive(message = "Experience years must be positive")
     @Schema(description = "Years of professional experience", example = "10")

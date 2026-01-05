@@ -35,7 +35,9 @@ public class RankingService {
                     DoctorRankingItem item = new DoctorRankingItem();
                     item.setId(doctor.getId());
                     item.setName(doctor.getUser().getFullName());
-                    item.setSpecialization(doctor.getSpecialization());
+                    if (doctor.getDepartment() != null) {
+                        item.setSpecialization(doctor.getDepartment().getDisplayName()); // Keep for backward compatibility
+                    }
                     item.setClinicName(doctor.getClinic().getName());
                     item.setExperienceYears(doctor.getExperienceYears());
 
@@ -142,4 +144,5 @@ public class RankingService {
         return response;
     }
 }
+
 

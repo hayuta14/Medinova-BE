@@ -22,7 +22,8 @@ public class AppointmentResponse {
     // Doctor info (simplified)
     private Long doctorId;
     private String doctorName;
-    private String doctorSpecialization;
+    private String doctorDepartment; // Department enum value (e.g., CARDIOLOGY)
+    private String doctorDepartmentDisplayName; // Department display name (e.g., "Tim mạch")
     
     // Clinic info (simplified)
     private Long clinicId;
@@ -37,11 +38,12 @@ public class AppointmentResponse {
     
     // Appointment details
     private LocalDateTime appointmentTime;
-    private String status; // PENDING | CONFIRMED | COMPLETED | CANCELLED
+    private String status; // PENDING | CONFIRMED | CHECKED_IN | IN_PROGRESS | REVIEW | COMPLETED | CANCELLED | NO_SHOW | REJECTED | EXPIRED | CANCELLED_BY_DOCTOR | CANCELLED_BY_PATIENT
     private Integer age;
     private String gender; // MALE | FEMALE | OTHER
     private String symptoms;
     private String notes; // Doctor's consultation notes
+    private String rejectionReason; // Internal reason for rejection/cancellation (only visible to doctor/admin)
     private LocalDateTime createdAt;
 }
 

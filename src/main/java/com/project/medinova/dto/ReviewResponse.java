@@ -15,6 +15,7 @@ public class ReviewResponse {
     private String doctorName;
     private Long patientId;
     private String patientName;
+    private Long appointmentId; // Optional: link to appointment if review is from appointment
     private Integer rating;
     private String comment;
     private LocalDateTime createdAt;

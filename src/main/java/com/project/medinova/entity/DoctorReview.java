@@ -25,6 +25,10 @@ public class DoctorReview {
     @JoinColumn(name = "patient_id", nullable = false)
     private User patient;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "appointment_id", nullable = true)
+    private Appointment appointment; // Optional: link to appointment if review is from appointment
+
     @Column(nullable = false)
     private Integer rating;
 

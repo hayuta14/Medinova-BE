@@ -65,3 +65,4 @@ CHECK (department IN (
 -- ALTER TABLE doctors DROP COLUMN IF EXISTS specialization;
 
 
+

@@ -78,3 +78,4 @@ ALTER TABLE doctors DROP COLUMN IF EXISTS department;
 - Sau khi migration thành công, bạn có thể xóa cột `specialization` nếu không cần thiết
 
 
+

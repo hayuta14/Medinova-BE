@@ -142,6 +142,28 @@ public class AppointmentService {
         LocalDate appointmentDate = appointmentTime.toLocalDate();
         LocalTime appointmentTimeOnly = appointmentTime.toLocalTime();
 
+        // Kiểm tra user đã có appointment trong ngày này chưa (mỗi ngày chỉ được đặt 1 lịch)
+        List<Appointment> existingAppointments = appointmentRepository.findByPatientIdAndAppointmentDate(
+            currentUser.getId(), appointmentDate
+        );
+        
+        // Filter out cancelled, rejected, expired appointments
+        List<Appointment> activeAppointments = existingAppointments.stream()
+            .filter(apt -> {
+                String status = apt.getStatus() != null ? apt.getStatus().toUpperCase() : "";
+                return !status.equals("CANCELLED") && 
+                       !status.equals("REJECTED") && 
+                       !status.equals("EXPIRED") && 
+                       !status.equals("COMPLETED") &&
+                       !status.equals("CANCELLED_BY_DOCTOR") &&
+                       !status.equals("CANCELLED_BY_PATIENT");
+            })
+            .collect(Collectors.toList());
+        
+        if (!activeAppointments.isEmpty()) {
+            throw new BadRequestException("Bạn đã có lịch hẹn trong ngày này. Mỗi ngày chỉ có thể đặt một lịch hẹn. Vui lòng chọn ngày khác.");
+        }
+
         // Kiểm tra doctor có đang nghỉ (leave request approved) trong thời gian này không
         List<DoctorLeaveRequest> approvedLeaves = leaveRequestRepository
                 .findByDoctorIdAndStatus(doctor.getId(), "APPROVED");
@@ -442,12 +464,17 @@ public class AppointmentService {
             throw new BadRequestException("Patients can only cancel appointments");
         }
 
-        // Cập nhật status
-        appointment.setStatus(request.getStatus());
+        // Cập nhật status - patient cancel sẽ set thành CANCELLED_BY_PATIENT
+        appointment.setStatus("CANCELLED_BY_PATIENT");
+        
+        // Lưu lý do hủy (nếu có) - sẽ hiển thị cho bác sĩ
+        if (request.getReason() != null && !request.getReason().trim().isEmpty()) {
+            appointment.setRejectionReason(request.getReason());
+        }
 
         // Nếu cancel, cập nhật schedule status (mỗi appointment có schedule riêng 1-1)
-        if ("CANCELLED".equals(request.getStatus())) {
-            DoctorSchedule schedule = appointment.getSchedule();
+        DoctorSchedule schedule = appointment.getSchedule();
+        if (schedule != null) {
             // Update schedule status để đánh dấu đã bị cancel
             schedule.setStatus("BLOCKED");
             scheduleRepository.save(schedule);
@@ -1067,6 +1094,71 @@ public class AppointmentService {
             schedule.setStatus("BLOCKED");
             scheduleRepository.save(schedule);
         }
+
+        Appointment savedAppointment = appointmentRepository.save(appointment);
+        return toAppointmentResponse(savedAppointment);
+    }
+
+    /**
+     * Assign appointment to another doctor
+     * Current doctor can transfer their appointment to another doctor in the same clinic
+     */
+    public AppointmentResponse assignAppointment(Long id, com.project.medinova.dto.AssignAppointmentRequest request) {
+        // Lấy user hiện tại từ JWT
+        User currentUser = authService.getCurrentUser();
+        if (currentUser == null) {
+            throw new ForbiddenException("User not authenticated");
+        }
+
+        // Kiểm tra user có role DOCTOR
+        if (!"DOCTOR".equals(currentUser.getRole())) {
+            throw new ForbiddenException("Only doctors can assign appointments");
+        }
+
+        // Tìm doctor profile hiện tại
+        Doctor currentDoctor = doctorRepository.findByUserId(currentUser.getId())
+                .orElseThrow(() -> new NotFoundException("Doctor profile not found"));
+
+        // Tìm appointment
+        Appointment appointment = appointmentRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Appointment not found with id: " + id));
+
+        // Kiểm tra appointment được assign cho doctor hiện tại
+        if (!appointment.getDoctor().getId().equals(currentDoctor.getId())) {
+            throw new ForbiddenException("You can only assign appointments assigned to you");
+        }
+
+        // Kiểm tra status - chỉ có thể assign nếu chưa completed
+        String currentStatus = appointment.getStatus();
+        if ("COMPLETED".equals(currentStatus) || "CANCELLED".equals(currentStatus) || 
+            "CANCELLED_BY_DOCTOR".equals(currentStatus) || "CANCELLED_BY_PATIENT".equals(currentStatus) ||
+            "REJECTED".equals(currentStatus) || "EXPIRED".equals(currentStatus)) {
+            throw new BadRequestException("Cannot assign appointment with status: " + currentStatus);
+        }
+
+        // Tìm doctor mới
+        Doctor newDoctor = doctorRepository.findById(request.getDoctorId())
+                .orElseThrow(() -> new NotFoundException("Doctor not found with id: " + request.getDoctorId()));
+
+        // Kiểm tra doctor mới thuộc cùng clinic
+        if (!newDoctor.getClinic().getId().equals(appointment.getClinic().getId())) {
+            throw new BadRequestException("New doctor must belong to the same clinic");
+        }
+
+        // Kiểm tra doctor mới có status APPROVED
+        if (!"APPROVED".equals(newDoctor.getStatus())) {
+            throw new BadRequestException("New doctor is not approved. Status: " + newDoctor.getStatus());
+        }
+
+        // Lưu lý do assign (nếu có) vào rejectionReason field
+        if (request.getReason() != null && !request.getReason().trim().isEmpty()) {
+            appointment.setRejectionReason("Assigned to Dr. " + newDoctor.getUser().getFullName() + ": " + request.getReason());
+        } else {
+            appointment.setRejectionReason("Assigned to Dr. " + newDoctor.getUser().getFullName());
+        }
+
+        // Assign appointment cho doctor mới
+        appointment.setDoctor(newDoctor);
 
         Appointment savedAppointment = appointmentRepository.save(appointment);
         return toAppointmentResponse(savedAppointment);

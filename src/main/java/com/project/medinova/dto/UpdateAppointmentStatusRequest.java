@@ -13,5 +13,8 @@ public class UpdateAppointmentStatusRequest {
     @Pattern(regexp = "CANCELLED", message = "Patients can only cancel appointments. Status must be CANCELLED")
     @Schema(description = "New status for the appointment. Patients can only set status to CANCELLED.", example = "CANCELLED", allowableValues = {"CANCELLED"})
     private String status;
+    
+    @Schema(description = "Reason for cancellation (optional). This will be visible to the doctor.", example = "I need to reschedule due to personal reasons")
+    private String reason;
 }
 

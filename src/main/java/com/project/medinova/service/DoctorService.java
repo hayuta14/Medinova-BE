@@ -5,12 +5,14 @@ import com.project.medinova.dto.UpdateDoctorRequest;
 import com.project.medinova.entity.Clinic;
 import com.project.medinova.entity.Department;
 import com.project.medinova.entity.Doctor;
+import com.project.medinova.entity.DoctorUpdateRequest;
 import com.project.medinova.entity.User;
 import com.project.medinova.exception.BadRequestException;
 import com.project.medinova.exception.NotFoundException;
 import com.project.medinova.exception.ForbiddenException;
 import com.project.medinova.repository.ClinicRepository;
 import com.project.medinova.repository.DoctorRepository;
+import com.project.medinova.repository.DoctorUpdateRequestRepository;
 import com.project.medinova.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -19,6 +21,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -33,6 +36,9 @@ public class DoctorService {
 
     @Autowired
     private ClinicRepository clinicRepository;
+
+    @Autowired
+    private DoctorUpdateRequestRepository doctorUpdateRequestRepository;
 
     @Autowired
     private AuthService authService;
@@ -156,34 +162,76 @@ public class DoctorService {
             isDoctorUpdatingSelf = true;
         }
 
+        // Nếu là ADMIN update, apply trực tiếp
+        if (!isDoctorUpdatingSelf) {
+            if (request.getClinicId() != null) {
+                Clinic clinic = clinicRepository.findById(request.getClinicId())
+                        .orElseThrow(() -> new NotFoundException("Clinic not found with id: " + request.getClinicId()));
+                doctor.setClinic(clinic);
+            }
+
+            if (request.getDepartment() != null) {
+                doctor.setDepartment(request.getDepartment());
+            }
+            if (request.getExperienceYears() != null) {
+                doctor.setExperienceYears(request.getExperienceYears());
+            }
+            if (request.getBio() != null) {
+                doctor.setBio(request.getBio());
+            }
+            if (request.getDefaultStartTime() != null) {
+                doctor.setDefaultStartTime(request.getDefaultStartTime());
+            }
+            if (request.getDefaultEndTime() != null) {
+                doctor.setDefaultEndTime(request.getDefaultEndTime());
+            }
+
+            return doctorRepository.save(doctor);
+        }
+
+        // Nếu là DOCTOR tự update, tạo update request thay vì update trực tiếp
+        // Kiểm tra xem đã có pending request chưa
+        var existingPendingRequest = doctorUpdateRequestRepository.findByDoctorIdAndStatus(id, "PENDING");
+        DoctorUpdateRequest updateRequest;
+        
+        if (existingPendingRequest.isPresent()) {
+            // Update existing pending request
+            updateRequest = existingPendingRequest.get();
+        } else {
+            // Create new update request
+            updateRequest = new DoctorUpdateRequest();
+            updateRequest.setDoctor(doctor);
+            updateRequest.setStatus("PENDING");
+        }
+
+        // Set các giá trị mới vào update request
         if (request.getClinicId() != null) {
             Clinic clinic = clinicRepository.findById(request.getClinicId())
                     .orElseThrow(() -> new NotFoundException("Clinic not found with id: " + request.getClinicId()));
-            doctor.setClinic(clinic);
+            updateRequest.setClinic(clinic);
         }
 
         if (request.getDepartment() != null) {
-            doctor.setDepartment(request.getDepartment());
+            updateRequest.setDepartment(request.getDepartment());
         }
         if (request.getExperienceYears() != null) {
-            doctor.setExperienceYears(request.getExperienceYears());
+            updateRequest.setExperienceYears(request.getExperienceYears());
         }
         if (request.getBio() != null) {
-            doctor.setBio(request.getBio());
+            updateRequest.setBio(request.getBio());
         }
         if (request.getDefaultStartTime() != null) {
-            doctor.setDefaultStartTime(request.getDefaultStartTime());
+            updateRequest.setDefaultStartTime(request.getDefaultStartTime());
         }
         if (request.getDefaultEndTime() != null) {
-            doctor.setDefaultEndTime(request.getDefaultEndTime());
+            updateRequest.setDefaultEndTime(request.getDefaultEndTime());
         }
 
-        // Nếu doctor tự update profile, set status về PENDING
-        if (isDoctorUpdatingSelf) {
-            doctor.setStatus("PENDING");
-        }
+        // Lưu update request
+        doctorUpdateRequestRepository.save(updateRequest);
 
-        return doctorRepository.save(doctor);
+        // Trả về doctor với thông tin hiện tại (không thay đổi)
+        return doctor;
     }
 
     public void deleteDoctor(Long id) {
@@ -209,8 +257,63 @@ public class DoctorService {
             throw new BadRequestException("Status must be either APPROVED or REJECTED");
         }
 
+        // Nếu approve, kiểm tra xem có pending update request không
+        if ("APPROVED".equals(status)) {
+            var pendingRequest = doctorUpdateRequestRepository.findByDoctorIdAndStatus(id, "PENDING");
+            if (pendingRequest.isPresent()) {
+                // Apply update request vào doctor
+                DoctorUpdateRequest updateRequest = pendingRequest.get();
+                
+                if (updateRequest.getClinic() != null) {
+                    doctor.setClinic(updateRequest.getClinic());
+                }
+                if (updateRequest.getDepartment() != null) {
+                    doctor.setDepartment(updateRequest.getDepartment());
+                }
+                if (updateRequest.getExperienceYears() != null) {
+                    doctor.setExperienceYears(updateRequest.getExperienceYears());
+                }
+                if (updateRequest.getBio() != null) {
+                    doctor.setBio(updateRequest.getBio());
+                }
+                if (updateRequest.getDefaultStartTime() != null) {
+                    doctor.setDefaultStartTime(updateRequest.getDefaultStartTime());
+                }
+                if (updateRequest.getDefaultEndTime() != null) {
+                    doctor.setDefaultEndTime(updateRequest.getDefaultEndTime());
+                }
+                
+                // Update request status
+                updateRequest.setStatus("APPROVED");
+                updateRequest.setReviewedAt(LocalDateTime.now());
+                doctorUpdateRequestRepository.save(updateRequest);
+            }
+        } else if ("REJECTED".equals(status)) {
+            // Nếu reject, chỉ cần update status của pending request
+            var pendingRequest = doctorUpdateRequestRepository.findByDoctorIdAndStatus(id, "PENDING");
+            if (pendingRequest.isPresent()) {
+                DoctorUpdateRequest updateRequest = pendingRequest.get();
+                updateRequest.setStatus("REJECTED");
+                updateRequest.setReviewedAt(LocalDateTime.now());
+                doctorUpdateRequestRepository.save(updateRequest);
+            }
+        }
+
         doctor.setStatus(status);
         return doctorRepository.save(doctor);
+    }
+
+    public List<DoctorUpdateRequest> getPendingUpdateRequests() {
+        return doctorUpdateRequestRepository.findByStatus("PENDING");
+    }
+
+    public long getPendingUpdateRequestsCount() {
+        return doctorUpdateRequestRepository.countByStatus("PENDING");
+    }
+
+    public DoctorUpdateRequest getUpdateRequestById(Long id) {
+        return doctorUpdateRequestRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Update request not found with id: " + id));
     }
 }
 

@@ -19,3 +19,5 @@ public interface AmbulanceBookingRepository extends JpaRepository<AmbulanceBooki
 
 
 
+
+

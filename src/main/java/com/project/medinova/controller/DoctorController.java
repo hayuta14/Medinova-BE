@@ -5,6 +5,7 @@ import com.project.medinova.dto.UpdateDoctorRequest;
 import com.project.medinova.dto.UpdateDoctorStatusRequest;
 import com.project.medinova.entity.Department;
 import com.project.medinova.entity.Doctor;
+import com.project.medinova.entity.DoctorUpdateRequest;
 import com.project.medinova.service.DoctorService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -249,11 +250,19 @@ public class DoctorController {
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/pending")
     public ResponseEntity<Map<String, Object>> getPendingDoctors() {
-        List<Doctor> pendingDoctors = doctorService.getPendingDoctors();
-        long totalPendingCount = doctorService.getPendingDoctorsCount();
+        // Lấy các doctors có pending update requests
+        List<DoctorUpdateRequest> pendingRequests = doctorService.getPendingUpdateRequests();
+        long totalPendingCount = doctorService.getPendingUpdateRequestsCount();
+        
+        // Convert to list of doctors with pending requests
+        List<Doctor> pendingDoctors = pendingRequests.stream()
+                .map(DoctorUpdateRequest::getDoctor)
+                .distinct()
+                .toList();
         
         Map<String, Object> response = new HashMap<>();
         response.put("doctors", pendingDoctors);
+        response.put("updateRequests", pendingRequests);
         response.put("totalPendingCount", totalPendingCount);
         
         return ResponseEntity.ok(response);

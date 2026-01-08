@@ -362,5 +362,25 @@ public class AppointmentController {
         AppointmentResponse appointment = appointmentService.cancelByDoctor(id, request);
         return ResponseEntity.ok(appointment);
     }
+
+    @Operation(
+            summary = "Assign appointment to another doctor",
+            description = "Assign an appointment to another doctor in the same clinic. The current doctor must be assigned to the appointment. The new doctor must be in the same clinic and have APPROVED status. A reason can be provided for the assignment."
+    )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Appointment assigned successfully"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Bad request - Invalid status or doctor/clinic mismatch"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden - Can only assign appointments assigned to you"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Not Found - Appointment or doctor not found")
+    })
+    @PreAuthorize("hasRole('DOCTOR')")
+    @PutMapping("/{id}/assign")
+    public ResponseEntity<AppointmentResponse> assignAppointment(
+            @PathVariable Long id,
+            @Valid @RequestBody com.project.medinova.dto.AssignAppointmentRequest request) {
+        AppointmentResponse appointment = appointmentService.assignAppointment(id, request);
+        return ResponseEntity.ok(appointment);
+    }
 }
 

@@ -79,3 +79,5 @@ ALTER TABLE doctors DROP COLUMN IF EXISTS department;
 
 
 
+
+
